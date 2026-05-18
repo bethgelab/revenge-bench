@@ -1,0 +1,33 @@
+{
+  "source": "codeclash_viewer",
+  "game": "Halite",
+  "model": "o3",
+  "tournament": "PvpTournament.Halite.r15.s250.p2.gpt-5.o3.251021082957.4d3eb30f-e143-4185-a765-e99b333307de-uuid",
+  "source_path": "data/inverse/extracted_strategies/Halite/PvpTournament.Halite.r15.s250.p2.gpt-5.o3.251021082957.4d3eb30f-e143-4185-a765-e99b333307de-uuid/final/o3",
+  "lines": 148,
+  "content_hash": "17ab493af1e6",
+  "complexity_score": 77,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 77,
+    "loc": 148,
+    "branch_count": 16,
+    "loop_count": 9,
+    "func_count": 1,
+    "strategy_score": 9,
+    "strategies_found": [
+      "border",
+      "production",
+      "strength",
+      "capture",
+      "heuristic",
+      "territory"
+    ]
+  },
+  "elo": 1636.2,
+  "elo_rank": 3,
+  "elo_total": 40,
+  "elo_win_rate": 0.867,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

@@ -1,0 +1,163 @@
+# Forward PvP: gpt5-mini__a2cbf9ec8b8a -- condition: recovered
+# Game: RobotRumble, OOD distance: 0.0277, best round: 2
+# Model: openai/kimi-k2.6
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): kimi-k2.6, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: RobotRumble
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robotrumble/gpt5-mini__a2cbf9ec8b8a
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/kimi-k2.6
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RobotRumble.
+    RobotRumble is a turn-based coding battle where you program a team of robots to move, attack, and outmaneuver your opponent on a 19x19 grid.
+    Each player controls a team of Soldier units (Blue vs Red). Each unit independently executes your function, choosing to Move or Attack in a cardinal direction. The game lasts up to 100 turns.
+    Every decision is driven by your code, and victory comes from crafting logic that positions robots smartly, times attacks well, and adapts over the match.
+    NOTE: Please ensure that your code runs efficiently (under 60 seconds). Code that exceeds this run time will automatically forfeit the round.
+    Your bot is a JavaScript file `robot.js` at the top level of your workspace.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your robot team. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `robot.js`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```javascript
+    function robot(state, unit) {
+      // Get enemy units (other team)
+      const enemies = state.objsByTeam(state.otherTeam);
+      if (!enemies || enemies.length === 0) {
+        // Fallback if no enemies known
+        return Action.move(Direction.North);
+      }
+
+      // Find closest enemy by Manhattan distance
+      let closest = null;
+      let minDist = Infinity;
+      for (let i = 0; i < enemies.length; i++) {
+        const e = enemies[i];
+        const d = unit.coords.distanceTo(e.coords);
+        if (d < minDist) {
+          minDist = d;
+          closest = e;
+        }
+      }
+
+      if (!closest) {
+        return Action.move(Direction.North);
+      }
+
+      const ux = unit.coords.x;
+      const uy = unit.coords.y;
+      const ex = closest.coords.x;
+      const ey = closest.coords.y;
+      const dx = ex - ux;
+      const dy = ey - uy;
+      const adx = Math.abs(dx);
+      const ady = Math.abs(dy);
+
+      // Attack if adjacent
+      if (adx + ady === 1) {
+        if (dx === 1) return Action.attack(Direction.East);
+        if (dx === -1) return Action.attack(Direction.West);
+        if (dy === 1) return Action.attack(Direction.South);
+        if (dy === -1) return Action.attack(Direction.North);
+      }
+
+      // Helper to test if moving in a direction leads to an unoccupied tile
+      function isFree(direction) {
+        const nx = unit.coords.x + direction.toCoords.x;
+        const ny = unit.coords.y + direction.toCoords.y;
+        const obj = state.objByCoords(new Coords(nx, ny));
+        return !obj;
+      }
+
+      // If diagonal (both non-zero), choose axis per analysis; avoid blocked primaries.
+      if (dx !== 0 && dy !== 0) {
+        let primary, secondary;
+
+        if (adx > ady) {
+          // Prefer horizontal when |dx| > |dy|
+          primary = dx > 0 ? Direction.East : Direction.West;
+          secondary = dy > 0 ? Direction.South : Direction.North;
+        } else if (ady > adx) {
+          // Prefer vertical when |dy| > |dx|
+          primary = dy > 0 ? Direction.South : Direction.North;
+          secondary = dx > 0 ? Direction.East : Direction.West;
+        } else {
+          // Equal |dx| == |dy|:
+          // Prefer vertical if dx > 0; prefer horizontal if dx < 0
+          if (dx > 0) {
+            primary = dy > 0 ? Direction.South : Direction.North;      // vertical
+            secondary = dx > 0 ? Direction.East : Direction.West;      // horizontal
+          } else {
+            primary = dx > 0 ? Direction.East : Direction.West;        // horizontal
+            secondary = dy > 0 ? Direction.South : Direction.North;    // vertical
+          }
+        }
+
+        if (isFree(primary)) {
+          return Action.move(primary);
+        } else if (isFree(secondary)) {
+          return Action.move(secondary);
+        } else {
+          // Try perpendicular rotations around primary as tertiary options (CW preferred)
+          const cw = primary.rotateCw;
+          if (isFree(cw)) return Action.move(cw);
+          const ccw = primary.rotateCcw;
+          if (isFree(ccw)) return Action.move(ccw);
+          // If all appear blocked, still issue the primary move (engine may resolve)
+          return Action.move(primary);
+        }
+      }
+
+      // Non-diagonal (line): move along the single axis toward the target, with block-aware fallback
+      if (dx !== 0 || dy !== 0) {
+        const primary = dx !== 0 ? (dx > 0 ? Direction.East : Direction.West)
+                                 : (dy > 0 ? Direction.South : Direction.North);
+        if (isFree(primary)) {
+          return Action.move(primary);
+        } else {
+          // Prefer rotating clockwise when primary is blocked, else counter-clockwise
+          const cw = primary.rotateCw;
+          if (isFree(cw)) return Action.move(cw);
+          const ccw = primary.rotateCcw;
+          if (isFree(ccw)) return Action.move(ccw);
+          // Fallback to primary if nothing seems free
+          return Action.move(primary);
+        }
+      }
+
+      // Same position fallback
+      return Action.move(Direction.North);
+    }
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

@@ -1,0 +1,225 @@
+"""
+Generate configuration files for tournaments between pairs of models in specified arenas.
+
+Each configuration file specifies a tournament between two models in a given arena,
+including the number of rounds and simulations per round. The configurations are saved
+as YAML files in the specified output directory (default: configs/main/).
+
+Also generates a tracking JSON file at configs/tracker.json to keep track of
+the number of tournaments and rounds played for each pair of models in each arena.
+
+Usage:
+
+python revenge_bench/utils/generate_confs.py -m configs/models.yaml -r 15 -s 1000
+"""
+
+import argparse
+import json
+from pathlib import Path
+
+import yaml
+
+from revenge_bench.arenas import (
+    ARENAS,
+    CodeArena,
+    RoboCodeArena,
+)
+
+
+class IncludeTag:
+    def __init__(self, value):
+        self.value = value
+
+
+class LiteralString(str):
+    pass
+
+
+def include_representer(dumper, data):
+    return dumper.represent_scalar("!include", data.value)
+
+
+def literal_representer(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+
+
+yaml.add_representer(IncludeTag, include_representer)
+yaml.add_representer(LiteralString, literal_representer)
+yaml.SafeDumper.add_representer(IncludeTag, include_representer)
+yaml.SafeDumper.add_representer(LiteralString, literal_representer)
+
+
+NUM_TOURNAMENTS = 10
+TRACKING_PATH = "configs/tracker.json"
+
+
+def prompt_game_desc(arena, rounds, players):
+    # Return as a LiteralString to get proper YAML literal block scalar formatting
+    content = f"""You are a software developer ({{{{player_id}}}}) competing in a coding game called {arena.name}.
+{arena.description}
+
+The game is played in {rounds} rounds. For every round, you (and your competitors) edit program code that controls your bot. This is round {{{{round}}}}.
+After you and your competitor finish editing your codebases, the game is run automatically.
+
+Your task: improve the bot in `{arena.submission}`, located in {{{{working_dir}}}}.
+{{{{working_dir}}}} is your codebase, which contains both your both and supporting assets.
+All of your commands will be executed in the {{{{working_dir}}}} directory (see notes below)."""
+    return LiteralString(content)
+
+
+def get_config(rounds: int, simulations: int, arena: CodeArena, players: list[dict], prompt_func=prompt_game_desc):
+    return {
+        "tournament": {
+            "rounds": rounds,
+        },
+        "game": {
+            "name": arena.name,
+            "sims_per_round": simulations,
+            "args": arena.default_args,
+        },
+        "players": [
+            {
+                "agent": "mini",
+                "name": get_name(p),
+                "config": {"agent": IncludeTag("mini/default.yaml"), "model": p},
+            }
+            for p in players
+        ],
+        "prompts": {"game_description": prompt_func(arena, rounds, players)},
+    }
+
+
+def clean_config(config_path: str):
+    # Post-process to remove quotes around include paths
+    with open(config_path) as f:
+        content = f.read()
+
+    # Remove quotes around include paths
+    content = content.replace("!include 'mini/", "!include mini/")
+    content = content.replace(".yaml'", ".yaml")
+
+    with open(config_path, "w") as f:
+        f.write(content)
+
+
+def get_name(p):
+    return p["model_name"].split("/")[-1]
+
+
+def robocode_adjustments(config: dict, record_ratio: float):
+    config["game"]["record_ratio"] = record_ratio
+    for idx in range(len(config["players"])):
+        config["players"][idx]["name"] = config["players"][idx]["name"].replace("-", "").replace(".", "")
+
+
+def main(models, arenas, rounds: int, simulations: int, record_ratio: float, output: Path):
+    # Get all unique pairs of models
+    models = yaml.safe_load(open(models))
+    output.mkdir(parents=True, exist_ok=True)
+    pairs = []
+    for i in range(len(models)):
+        for j in range(i + 1, len(models)):
+            pairs.append((models[i], models[j]))
+
+    tracking_dict = {}
+    arenas_list = ARENAS if arenas == "all" else [a for a in ARENAS if a.name in arenas.split(",")]
+    if not arenas_list:
+        print(f"No valid arenas found from {arenas}. Choose from {[a.name for a in ARENAS]}.")
+        return  # Stop execution if no valid arenas are found
+    for arena in arenas_list:
+        print(f"Generating {len(pairs)} configs for arena: {arena.name}")
+        tracking_dict[arena.name] = {}
+        for pair in pairs:
+            config = get_config(rounds, simulations, arena, pair)
+
+            if arena == RoboCodeArena:
+                robocode_adjustments(config, record_ratio)
+
+            pair_names = "__".join(sorted([get_name(pair[0]), get_name(pair[1])]))
+            config_name = f"{arena.name}__{pair_names}__r{rounds}__s{simulations}.yaml"
+            with open(output / config_name, "w") as f:
+                yaml.dump(
+                    config,
+                    f,
+                    default_style=None,
+                    sort_keys=False,
+                    allow_unicode=True,
+                    default_flow_style=False,
+                    Dumper=yaml.SafeDumper,
+                )
+
+            clean_config(output / config_name)
+
+            pvp = ".".join(sorted([get_name(pair[0]), get_name(pair[1])]))
+            tracking_key = f"r{rounds}.s{simulations}.p2"
+            if tracking_key not in tracking_dict[arena.name]:
+                tracking_dict[arena.name][tracking_key] = {}
+            tracking_dict[arena.name][tracking_key][pvp] = 0
+
+    if Path(TRACKING_PATH).exists():
+        with open(TRACKING_PATH) as f:
+            tracking_dict_current = json.load(f)
+        tracking_dict.update(tracking_dict_current)
+
+    with open(TRACKING_PATH, "w") as f:
+        json.dump(tracking_dict, f, indent=2)
+    print(f"Wrote tracking file to '{TRACKING_PATH}'.")
+
+    print(f"Generated {len(pairs) * len(arenas_list)} configuration files in '{output}'.")
+    print(f"- # Models: {len(models)}")
+    print(f"- # Arenas: {len(ARENAS)}")
+    print(f"- r (rounds) {rounds}")
+    print(f"- s (sims_per_round) {simulations}")
+    total_rounds = (len(models) * (len(models) - 1) // 2) * rounds * len(ARENAS)
+
+    print("\n(Assuming each tournament is run once)")
+    print(f"- Total rounds played across all models: {total_rounds}")
+    rounds_per_model = total_rounds // len(models)
+    print(f"- Each model: {rounds_per_model}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate configuration files.")
+    parser.add_argument(
+        "-m",
+        "--models",
+        type=str,
+        default="configs/models.yaml",
+        help="Path to model configurations.",
+    )
+    parser.add_argument(
+        "-a",
+        "--arenas",
+        type=str,
+        default="all",
+        help="Comma separated list of arenas to generate configs for (default: all).",
+    )
+    parser.add_argument(
+        "-r",
+        "--rounds",
+        type=int,
+        default=15,
+        help="Number of rounds per tournament for the configuration (default: 15).",
+    )
+    parser.add_argument(
+        "-s",
+        "--simulations",
+        type=int,
+        default=1000,
+        help="Number of simulations to run per round (default: 1000).",
+    )
+    parser.add_argument(
+        "--record_ratio",
+        type=float,
+        default=1,
+        help="Fraction of simulations to record (default: 1 = all).",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("configs/main/"),
+        help="Output directory for configuration files (default: main/).",
+    )
+    args = parser.parse_args()
+    main(**vars(args))

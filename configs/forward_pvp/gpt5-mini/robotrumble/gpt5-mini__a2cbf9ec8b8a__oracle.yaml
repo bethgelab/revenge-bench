@@ -1,0 +1,136 @@
+# Forward PvP: gpt5-mini__a2cbf9ec8b8a — condition: oracle
+# Game: RobotRumble, OOD distance: 0.0277, best round: 2
+# Model: openai/gpt-5-mini
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): gpt-5-mini, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: RobotRumble
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robotrumble/gpt5-mini__a2cbf9ec8b8a
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-5-mini
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RobotRumble.
+    RobotRumble is a turn-based coding battle where you program a team of robots to move, attack, and outmaneuver your opponent on a 19x19 grid.
+    Each player controls a team of Soldier units (Blue vs Red). Each unit independently executes your function, choosing to Move or Attack in a cardinal direction. The game lasts up to 100 turns.
+    Every decision is driven by your code, and victory comes from crafting logic that positions robots smartly, times attacks well, and adapts over the match.
+    NOTE: Please ensure that your code runs efficiently (under 60 seconds). Code that exceeds this run time will automatically forfeit the round.
+    Your bot is a JavaScript file `robot.js` at the top level of your workspace.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your robot team. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `robot.js`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```javascript
+    function robot(state, unit) {
+      // helper to get object at absolute coords
+      function getObj(x, y) {
+        return state.objByCoords(new Coords(x, y));
+      }
+
+      // Try to move in the given direction; if blocked try rotateCw then rotateCcw
+      function tryMove(dir) {
+        if (!dir) return null;
+        let D = dir;
+        if (!getObj(unit.coords.x + D.toCoords.x, unit.coords.y + D.toCoords.y)) {
+          return Action.move(D);
+        }
+        D = dir.rotateCw;
+        if (!getObj(unit.coords.x + D.toCoords.x, unit.coords.y + D.toCoords.y)) {
+          return Action.move(D);
+        }
+        D = dir.rotateCcw;
+        if (!getObj(unit.coords.x + D.toCoords.x, unit.coords.y + D.toCoords.y)) {
+          return Action.move(D);
+        }
+        return null;
+      }
+
+      // Try a list of candidate directions, returning the first valid move action
+      function tryMoves(candidates) {
+        for (let i = 0; i < candidates.length; i++) {
+          let mv = tryMove(candidates[i]);
+          if (mv) return mv;
+        }
+        return null;
+      }
+
+      let enemies = state.objsByTeam(state.otherTeam) || [];
+
+      // If no enemies are visible, move toward center (or step randomly a bit)
+      if (enemies.length === 0) {
+        let center = new Coords(Math.floor(MAP_SIZE / 2), Math.floor(MAP_SIZE / 2));
+        let dir = unit.coords.directionTo(center);
+        // try direct, then slight randomization by trying rotates
+        return tryMoves([dir, dir.rotateCw, dir.rotateCcw]) || Action.move(dir);
+      }
+
+      // Choose the closest enemy (tiebreaker by health)
+      let closest = _.minBy(enemies, e => unit.coords.distanceTo(e.coords) + ((e.health != null) ? e.health / 10 : 0));
+      if (!closest) return null;
+
+      let dirToEnemy = unit.coords.directionTo(closest.coords);
+      let dist = unit.coords.distanceTo(closest.coords);
+
+      // If adjacent: attack
+      if (dist === 1) {
+        return Action.attack(dirToEnemy);
+      }
+
+      // Aggressive approach with extensive fallback moves to navigate around obstacles
+      // Try direct approach first
+      let mv = tryMove(dirToEnemy);
+      if (mv) return mv;
+
+      // Try rotated alternatives and double-rotations to get around blockers
+      let dirCW = dirToEnemy.rotateCw;
+      let dirCCW = dirToEnemy.rotateCcw;
+      let dirCWCW = dirCW.rotateCw;
+      let dirCCWCCW = dirCCW.rotateCcw;
+
+      mv = tryMoves([dirCW, dirCCW, dirCWCW, dirCCWCCW]);
+      if (mv) return mv;
+
+      // Try moving toward center (to avoid camping) as an escape or reposition
+      let center = new Coords(Math.floor(MAP_SIZE / 2), Math.floor(MAP_SIZE / 2));
+      let dirToCenter = unit.coords.directionTo(center);
+      mv = tryMoves([dirToCenter, dirToCenter.rotateCw, dirToCenter.rotateCcw]);
+      if (mv) return mv;
+
+      // Try perpendicular flanks
+      mv = tryMoves([dirCW, dirCCW]);
+      if (mv) return mv;
+
+      // Last resort: attack toward enemy direction to at least deal damage if stuck
+      return Action.attack(dirToEnemy);
+    }
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

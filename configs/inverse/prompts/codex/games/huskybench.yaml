@@ -1,0 +1,220 @@
+game_description: |
+  You are a programmer ({{player_id}}) learning to recover another agent's poker strategy.
+
+  ## Your Goal
+  Write code that produces the SAME actions as the target agent.
+  This is NOT about winning — it's about matching the target's behavior exactly.
+
+  ## The Game: HuskyBench (Poker)
+  HuskyBench is a heads-up No-Limit Texas Hold'em poker game.
+  - Each hand: you get 2 hole cards, then community cards are revealed over 4 rounds
+  - Betting rounds: preflop, flop (3 cards), turn (4 cards), river (5 cards)
+  - Actions: FOLD, CHECK, CALL, or RAISE:<ratio>
+  - Raise ratio: amount / player_stack, a float in (0, 1] (1.0 = all-in)
+  - Starting stack: 10,000 chips
+
+  ## How Evaluation Works (IMPORTANT)
+  - You do NOT play in the live game
+  - The target plays against an opponent to generate traces
+  - Your code is evaluated OFFLINE: for each decision point the target faced,
+    we ask "what would your code do?" and compare to target's action
+  - Distance = mean action distance between your code and target (lower is better, 0 = perfect)
+  - Action distance uses a log-commitment scale normalized per the actor's
+    stack S at the decision point: FOLD is distance 1.0 from every non-FOLD
+    action, CHECK/CALL are passive (treated as RAISE:0), and two raises with
+    ratios r1 and r2 are compared by |c(r1; S) - c(r2; S)| where
+    c(r; S) = log1p(r * S) / log1p(S). Under this scale small raises are
+    meaningfully separated from CHECK/CALL, and an all-in is always
+    distance 1 from CHECK — regardless of how short the stack is. Matching
+    the target's raise magnitude is worth more than matching its ratio to
+    within a few percent.
+
+  ## Your Bot Class (client/player.py)
+  Your submission file is `client/player.py`. It must define a class that subclasses `Bot`
+  and implements ALL required methods. The starter code already has the right structure.
+
+  **IMPORTANT: You MUST implement all 5 methods below.** If any are missing, your bot
+  will fail to instantiate and evaluation will fail. Do NOT remove any methods when editing.
+
+  ```python
+  from typing import List, Tuple
+  from bot import Bot
+  from type.poker_action import PokerAction
+  from type.round_state import RoundStateClient
+
+  class SimplePlayer(Bot):
+      def __init__(self):
+          super().__init__()
+
+      def on_start(self, starting_chips: int, player_hands: List[str], blind_amount: int,
+                   big_blind_player_id: int, small_blind_player_id: int, all_players: List[int]):
+          """Called once at game start. Store your hole cards here."""
+          self.my_hand = player_hands
+          self.blind_amount = blind_amount
+
+      def on_round_start(self, round_state: RoundStateClient, remaining_chips: int):
+          """Called at the start of each betting round."""
+          pass
+
+      def get_action(self, round_state: RoundStateClient, remaining_chips: int) -> Tuple[PokerAction, int]:
+          # round_state fields:
+          #   round_state.round       - "preflop", "flop", "turn", "river"
+          #   round_state.community_cards - list of visible community cards
+          #   round_state.pot         - current pot size
+          #   round_state.current_bet - amount to call
+          #   round_state.min_raise   - minimum raise amount
+          #   round_state.max_raise   - maximum raise amount
+          #   round_state.player_bets - dict of player bets
+          #   round_state.player_actions - dict of player actions
+          #   round_state.player_money - dict of player chip counts
+          #   round_state.round_num   - hand number
+          #
+          # self.my_hand  - your 2 hole cards (set in on_start above)
+          #
+          # Return (PokerAction, amount):
+          #   (PokerAction.FOLD, 0)
+          #   (PokerAction.CHECK, 0)
+          #   (PokerAction.CALL, 0)
+          #   (PokerAction.RAISE, amount)  - amount in chips (converted to ratio internally)
+          #   (PokerAction.ALL_IN, 0)
+
+          if round_state.current_bet == 0:
+              return PokerAction.CHECK, 0
+          return PokerAction.CALL, 0
+
+      def on_end_round(self, round_state: RoundStateClient, remaining_chips: int):
+          """Called at the end of every round."""
+          pass
+
+      def on_end_game(self, round_state: RoundStateClient, player_score: float,
+                      all_scores: dict, active_players_hands: dict):
+          """Called once when the game finishes."""
+          pass
+  ```
+
+  Action distance for evaluation (log-commitment scale, per-state normalized):
+  FOLD is distance 1.0 from any non-FOLD action; CHECK/CALL are passive
+  (treated as RAISE:0); raises are compared via c(r; S) = log1p(r * S) / log1p(S)
+  where S is the actor's stack at the decision. An all-in is always
+  distance 1 from CHECK, at any stack size.
+
+  ## How It Works (IMPORTANT)
+  Each round:
+  1. You PROBE first to test hypotheses about the target
+  2. You EDIT your submission based on probe results + traces
+  3. At round end, main simulation runs: target vs MULTIPLE opponents
+  4. You get traces showing target's actions against different opponents
+  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect)
+
+  ## Multi-Opponent Advantage
+
+  Each round the target plays against MULTIPLE different opponents. This gives
+  you **richer data** — you see how the target behaves in diverse game situations
+  within a single round.
+
+  **The target's strategy is FIXED and never changes.** Different opponents
+  create different hand histories, but the target's decision rules are constant.
+  Use this diversity to your advantage:
+
+  - **Find invariant rules** — what does the target ALWAYS do, regardless of
+    which opponent it faces? These are the core decision rules you need to code.
+  - **Cross-validate hypotheses** — if a rule holds against opponent A but not
+    opponent B, it's probably not the right rule. True target rules are universal.
+  - **Don't overfit to one opponent's traces** — build general rules that work
+    in any game situation, not just the specific hands you've seen.
+
+  ## IMPORTANT: Probe-First Workflow
+
+  **Always probe BEFORE editing your submission.** Probes are your primary tool for
+  understanding the target. Traces only show what happened — probes let you
+  run controlled experiments.
+
+  **Recommended workflow each round:**
+  1. Read traces.json — identify mismatches
+  2. Form a hypothesis (e.g., "target folds weak hands preflop" or "target always raises with pocket pairs")
+  3. Design a probe to elicit specific behavior from the target (edit files in `probe/` to create that scenario)
+  4. Call the `run_probe` MCP tool and analyze results
+  5. Run 1-2 more probes to refine understanding
+  6. THEN edit your submission based on confirmed hypotheses
+
+  Probes are cheap and fast. Editing your submission without probing first is like
+  coding without testing — you'll waste rounds on wrong guesses.
+
+  ## Inline Probing (YOUR PRIMARY TOOL)
+
+  You can run probe simulations AT ANY TIME during editing!
+
+  `probe/client/player.py` is automatically seeded from your current `client/player.py` at the start of each round.
+  You just need to modify it to create the test scenario you want, then call the `run_probe` MCP tool.
+
+  ### How to Probe
+  1. Edit `probe/client/player.py` implementing a strategy that will elicit the behavior you want to test
+  2. Call the `run_probe` MCP tool — the system will play your probe against the target
+  3. Read the results to see what the target did in the situations your probe created
+
+  You get up to 5 probes per round. **Aim to use at least 2 per round.**
+
+  ### CRITICAL: Separate Exploration from Exploitation
+
+  **`probe/` is your EXPERIMENT. `client/player.py` is your ANSWER. Keep them separate.**
+
+  Rules:
+  1. **`probe/client/player.py` must be DIFFERENT from `client/player.py`.** If they're identical, the probe tells you nothing new.
+  2. **After each probe, STOP and analyze before probing again.** Write down:
+     - What did you learn from the mismatch data?
+     - What should you change in your submission based on this?
+     - What should your next probe test?
+     Never submit consecutive probes without analysis in between.
+  3. **Only edit your submission AFTER you have probe evidence.**
+
+  Think of it this way:
+  - **`probe/` = laboratory** — run experiments here, it's safe to try wild things
+  - **`client/player.py` = production** — only deploy validated findings here
+
+  ### Probe Output Format
+  After each probe, results are written to a JSON file in your workspace:
+  `probe_trace_r{round}_p{probe_num}.json`
+
+  ```json
+  {
+    "probe_id": 1,
+    "description": "probe vs target - showing what each did in same state",
+    "total_turns": 40,
+    "num_simulations": 3,
+    "pairs": [
+      {
+        "turn": 5,
+        "probe_action": "RAISE:0.5000",
+        "target_action": "CALL",
+        "distance": 0.5,
+        "target_state": {...}
+      }
+    ]
+  }
+  ```
+
+  Actions are normalized: FOLD, CHECK, CALL, or RAISE:<ratio>.
+  Distance is 0.0 (identical) to 1.0 (completely different).
+
+  ### Probe Strategy
+  - **Create specific scenarios**: Make probe bet aggressively/passively to see how target responds
+  - **Test hypotheses**: "Does target fold to large raises?" or "Does target bluff on the river?"
+  - **Explore edge cases**: See what target does with small stacks, big pots, different board textures
+  - **Use probe_action vs target_action**: Direct comparison in same game state!
+  - **Look for invariants**: Target rules that hold across ALL opponents are the most reliable
+
+  ## Key Files
+  - `client/player.py` - Your recovered policy (EDIT THIS — evaluated by action distance). **Only edit after probing.**
+  - `probe/client/player.py` - Your experiment instrument (copy of `client/player.py`). **Must differ from submission.** Auto-seeded each round.
+  - `docs/` - Game documentation and API reference
+  - `/logs/rounds/{N}/traces.json` - Distance results and nonzero_distances
+  - `/logs/rounds/{N}/game_log_*.json` - Raw game logs (target vs MULTIPLE opponents)
+
+  ## Tips
+  - **PROBE FIRST** — don't jump straight to editing your submission
+  - **Keep `probe/` different from `client/player.py`** — identical probes waste your probe budget
+  - After each probe, write a brief analysis before probing again
+  - **Build opponent-invariant rules** — focus on what the target ALWAYS does
+  - Traces from different opponents reveal different aspects of the target's strategy
+  - `probe/` is safe to experiment with — `client/player.py` is your graded submission
+  - Card notation: rank + suit (Ah=Ace of hearts, Td=10 of diamonds, 2c=2 of clubs)

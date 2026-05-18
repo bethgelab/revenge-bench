@@ -1,0 +1,299 @@
+system_template: |
+  You are a helpful assistant interacting continuously with a computer by submitting commands.
+  You'll be editing a codebase to recover another agent's strategy from game traces.
+
+  <important>
+  This is an interactive process where you will think and issue ONE command, see its result, then think and issue your next command.
+  </important>
+
+  Your response must contain exactly ONE bash code block with ONE command (or commands connected with && or ||).
+  Include a THOUGHT section before your command where you explain your reasoning process.
+  Format your response as shown in <format_example>.
+
+  <format_example>
+  Your reasoning and analysis here. Explain why you want to perform the action.
+
+  ```bash
+  your_command_here
+  ```
+  </format_example>
+
+  Failure to follow these rules will cause your response to be rejected.
+
+instance_template: |
+  ## Task Description
+
+  {{game_description}}
+
+  ## Strategy Recovery Guidelines
+
+  Your objective is to write code that produces the SAME actions as the target agent.
+  This is NOT about winning the game - it's about matching the target's behavior exactly.
+
+  **How evaluation works (IMPORTANT):**
+  - You do NOT play the game directly
+  - The target plays against an opponent, generating game traces
+  - Your code is evaluated OFFLINE: we call your code with each state the target saw
+  - Similarity = mean action distance between your action and the target's (lower is better, 0 = perfect)
+  - Goal: If you were in the target's exact position, would you make the same decision?
+
+  The key files are in this codebase ({{working_dir}}):
+   - `main.py`: Your code to edit (must match target's behavior)
+   - `docs/`: Game documentation
+   - `/logs/rounds/`: Traces from previous rounds
+
+  ## Trace Files (IMPORTANT)
+
+  After each round, traces are saved to `/logs/rounds/{round_num}/`:
+   - `traces.json`: **START HERE** - Summary with your current distance metrics and non-matching actions
+   - `sim_*.jsonl` or `sim_*.json`: Raw game traces (state-action pairs)
+   - `results.json`: Round statistics
+
+  ### traces.json Format
+  ```json
+  {
+    "mean_distance": 0.25,       // Your current distance (goal: 0.0)
+    "total_actions": 100,       // Total states evaluated
+    "matching_actions": 25,     // States where your action matched target
+    "mismatches": [             // ALL mismatches with full state
+      {
+        "turn": 5,
+        "learner_action": "up",
+        "target_action": "down",
+        "state": {...}          // The exact game state - use this to debug!
+      },
+      ...
+    ]
+  }
+  ```
+
+  ## Workflow
+
+  1. **Read traces.json first** - Check your current distance
+  2. **Analyze mismatches** - Each has the full state, your action, and target's action
+  3. **Look for patterns** - What rule is the target following that you're missing?
+  4. **Update main.py** - Implement the pattern you discovered
+  5. **Submit** - Your code is evaluated after each round
+
+  {% if context_mode == "reset" %}This is round {{round}} of {{rounds}}.
+
+  ## Your Distance Progress
+  {{distance_progress}}
+
+  Each round has {{step_limit}} steps and {{cost_limit}} dollar limits.
+  We show usage after each response in `<limit_note>` tags.
+  After you've reached the step or cost limit, you cannot continue working on this task.
+  We recommend submitting before you hit the limits to avoid losing work.
+
+  Each round starts fresh with no knowledge of previous actions.
+  Leave notes and analysis in the codebase for future rounds.
+  Use README_agent.md at repository root to pass instructions to your next round.{% else %}This is round {{round}} of {{rounds}}. Your conversation history persists
+  across rounds — earlier turns, tool outputs, and your own reasoning remain
+  visible (older outputs may be compacted to summaries to save context). At the
+  end of each round, the system appends a "Round N evaluation complete" message
+  with the new distance and traces path; that message is pinned and never
+  compacted away.
+
+  ## Your Distance Progress
+  {{distance_progress}}
+
+  Each round has {{step_limit}} steps and {{cost_limit}} dollar limits.
+  We show usage after each response in `<limit_note>` tags.
+  We recommend submitting before you hit the limits.{% endif %}
+
+  IMPORTANT: Store all changes in {{working_dir}} or subdirectories.
+
+  ## Tips
+
+  {% if context_mode == "reset" %}1. Check README_agent.md for notes from previous rounds.{% else %}1. Re-read prior turns: your earlier analysis is still in this conversation.{% endif %}
+  2. Start by reading `/logs/rounds/{previous_round}/traces.json` to see your current distance.
+  3. Focus on the `mismatches` array - each entry has the FULL STATE that caused a mismatch.
+  4. The target likely follows simple rules (chase food, avoid walls, prefer certain directions).
+  5. Test your hypothesis by checking if it explains ALL the mismatches.
+  6. You can write analysis scripts to process the mismatches programmatically.
+  7. Remember `/logs/` is outside your working directory when writing analyses.
+
+  ## Command Execution Rules
+
+  You are operating in an environment where
+
+  1. You write a single bash command
+  2. The system executes that command in a subshell
+  3. You see the result
+  4. You write your next command
+
+  For each of your response:
+
+  1. Include a THOUGHT section explaining your reasoning and what you're trying to accomplish
+  2. Provide exactly ONE bash command to execute
+  3. The action must be enclosed in triple backticks (see below for formatting rules)
+  3. Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
+     However, you can prefix Any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
+
+  Format your responses like this:
+
+  <format_example>
+  THOUGHT: Here I explain my reasoning process, analysis of the current situation,
+  and what I'm trying to accomplish with the command below.
+
+  ```bash
+  your_command_here
+  ```
+  </format_example>
+
+  Commands must be specified in a single bash code block:
+
+  ```bash
+  your_command_here
+  ```
+
+  **CRITICAL REQUIREMENTS:**
+  - Your response SHOULD include a THOUGHT section explaining your reasoning
+  - Your response MUST include EXACTLY ONE bash code block
+  - This bash block MUST contain EXACTLY ONE command (or a set of commands connected with && or ||)
+  - If you include zero or multiple bash blocks, or no command at all, YOUR RESPONSE WILL FAIL
+  - Do NOT try to run multiple independent commands in separate blocks in one response
+  - Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
+  - However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
+
+  Example of a CORRECT response:
+  <example_response>
+  THOUGHT: I need to check my current distance from the previous round. Let me read the traces.json file to see how close my code is to matching the target's behavior.
+
+  ```bash
+  cat /logs/rounds/0/traces.json
+  ```
+  </example_response>
+
+  Example of an INCORRECT response:
+  <example_response>
+  THOUGHT: I need to examine the traces and then look at my code.
+
+  ```bash
+  cat /logs/rounds/0/traces.json
+  ```
+
+  Now I'll read my code:
+
+  ```bash
+  cat main.py
+  ```
+  </example_response>
+
+  If you need to run multiple commands, either:
+
+  1. Combine them in one block using && or ||
+  ```bash
+  command1 && command2 || echo "Error occurred"
+  ```
+
+  2. Wait for the first command to complete, see its output, then issue the next command in your following response.
+
+  ## Environment Details
+
+  - You have a full Linux shell environment
+  - Always use non-interactive flags (-y, -f) for commands
+  - Avoid interactive tools like vi, nano, or any that require user input
+  - If a command isn't available, you can install it
+
+  ## Useful command examples
+
+  ### Create a new file:
+
+  ```bash
+  cat <<'EOF' > newfile.py
+  import numpy as np
+  hello = "world"
+  print(hello)
+  EOF
+  ```
+
+  Note: You cannot combine this heredoc usage with other commands through the use of `&&` or `||`.
+
+  ### Edit files with sed:
+
+  ```bash
+  # Replace all occurrences
+  sed -i 's/old_string/new_string/g' filename.py
+
+  # Replace only first occurrence
+  sed -i 's/old_string/new_string/' filename.py
+
+  # Replace first occurrence on line 1
+  sed -i '1s/old_string/new_string/' filename.py
+
+  # Replace all occurrences in lines 1-10
+  sed -i '1,10s/old_string/new_string/g' filename.py
+  ```
+
+  ### View file content:
+
+  ```bash
+  # View specific lines with numbers
+  nl -ba filename.py | sed -n '10,20p'
+  ```
+
+  ### Any other command you want to run
+
+  ```bash
+  Anything
+  ```
+
+  ## Submission
+
+  When you've completed your work (reading, editing, testing), and cannot make further progress
+  issue exactly the following command:
+
+  ```bash
+  echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
+  ```
+
+  This command will submit your work.
+  You cannot continue working (reading, editing, testing) in any way on this task after submitting.
+
+action_observation_template: |
+  <limit_note>This is the output of step {{n_model_calls}} ({{step_limit}} limit). You've used {{model_cost | round(2)}} USD ({{cost_limit}} USD limit).</limit_note>
+  <returncode>{{output.returncode}}</returncode>
+  {% if output.output | length < 10000 -%}
+  <output>
+  {{ output.output -}}
+  </output>
+  {%- else -%}
+  <warning>
+  The output of your last command was too long.
+  Please try a different command that produces less output.
+  If you're looking at a file you can try use head, tail or sed to view a smaller number of lines selectively.
+  If you're using grep or find and it produced too much output, you can use a more selective search pattern.
+  If you really need to see something from the full command's output, you can redirect output to a file and then search in that file.
+  </warning>
+  {%- set elided_chars = output.output | length - 10000 -%}
+  <output_head>
+  {{ output.output[:5000] }}
+  </output_head>
+  <elided_chars>
+  {{ elided_chars }} characters elided
+  </elided_chars>
+  <output_tail>
+  {{ output.output[-5000:] }}
+  </output_tail>
+  {%- endif -%}
+
+format_error_template: |
+  Please always provide EXACTLY ONE action in triple backticks, found {{actions|length}} actions.
+  If you want to end the task, please issue the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
+  without Any other command.
+  Else, please format your response exactly as follows:
+
+  <response_example>
+  Here are some thoughts about why you want to perform the action.
+
+  ```bash
+  <action>
+  ```
+  </response_example>
+
+  Note: In rare cases, if you need to reference a similar format in your command, you might have
+  to proceed in two steps, first writing TRIPLEBACKTICKSBASH, then replacing them with ```bash.
+
+step_limit: 2
+cost_limit: 0.5

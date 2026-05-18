@@ -1,0 +1,194 @@
+game_description: |
+  You are a programmer ({{player_id}}) learning to recover another agent's RobotRumble strategy.
+
+  ## Your Goal
+  Write code that produces the SAME actions as the target agent.
+  This is NOT about winning — it's about matching the target's behavior exactly.
+
+  ## The Game: RobotRumble
+  RobotRumble is a turn-based robot battle game on a 19x19 grid.
+  - You control a team of robots (each is a "Soldier" unit with health points)
+  - Two teams: Blue and Red, each starting with multiple units
+  - Game lasts up to 100 turns
+  - Each turn, every unit executes your `robot(state, unit)` function independently
+
+  ### Actions
+  Each unit can perform one action per turn:
+  - `{type: "Move", direction: "North"|"South"|"East"|"West"}` — move 1 cell
+  - `{type: "Attack", direction: "North"|"South"|"East"|"West"}` — attack adjacent cell
+
+  ### State Object (passed to your function)
+  ```javascript
+  state = {
+    turn: 5,                    // current turn number (1-indexed)
+    teams: {
+      Blue: [                    // your team's units
+        {id: "u1", coords: [3, 4], health: 5, team: "Blue", type: "Soldier"},
+        ...
+      ],
+      Red: [                     // enemy team's units
+        {id: "u2", coords: [7, 8], health: 3, team: "Red", type: "Soldier"},
+        ...
+      ]
+    }
+  }
+  ```
+
+  ### Unit Object (passed to your function)
+  ```javascript
+  unit = {
+    id: "u1",
+    coords: [3, 4],             // [x, y] position
+    health: 5,                   // remaining health
+    team: "Blue",
+    type: "Soldier"
+  }
+  ```
+
+  ### Your Bot Function (robot.js)
+  ```javascript
+  function robot(state, unit) {
+      // state.turn - current turn number
+      // state.objsByTeam(Team.Blue) - your team's units as Obj instances
+      // state.objsByTeam(Team.Red) - enemy units as Obj instances
+      // unit.coords - this unit's Coords {x, y}
+      // unit.health - this unit's health
+
+      // Return an Action:
+      return Action.move(Direction.North)
+      // or
+      return Action.attack(Direction.East)
+  }
+  ```
+
+  Your submission file is `robot.js`. Write a JavaScript function `robot(state, unit)`
+  that returns an Action. The stdlib provides Action, Direction, Coords, State, Obj, Team classes.
+
+  ## How Evaluation Works (IMPORTANT)
+  - You do NOT play in the live game
+  - The target plays against an opponent to generate traces
+  - Your code is evaluated OFFLINE: for each state the target saw,
+    we ask "what would your code do?" and compare to target's action
+  - Distance = mean action distance between your code and target (lower is better, 0 = perfect)
+  - Action distance: 0.0 if actions match exactly, 1.0 if they differ (type or direction)
+
+  ## How It Works (IMPORTANT)
+  Each round:
+  1. You PROBE first to test hypotheses about the target
+  2. You EDIT your submission based on probe results + traces
+  3. At round end, main simulation runs: target vs MULTIPLE opponents
+  4. You get traces showing target's actions against different opponents
+  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect)
+
+  ## Multi-Opponent Advantage
+
+  Each round the target plays against MULTIPLE different opponents. This gives
+  you **richer data** — you see how the target behaves in diverse game situations
+  within a single round.
+
+  **The target's strategy is FIXED and never changes.** Different opponents
+  create different board states, but the target's decision rules are constant.
+  Use this diversity to your advantage:
+
+  - **Find invariant rules** — what does the target ALWAYS do, regardless of
+    which opponent it faces? These are the core decision rules you need to code.
+  - **Cross-validate hypotheses** — if a rule holds against opponent A but not
+    opponent B, it's probably not the right rule. True target rules are universal.
+  - **Don't overfit to one opponent's traces** — build general rules that work
+    in any game situation, not just the specific turns you've seen.
+
+  ## IMPORTANT: Probe-First Workflow
+
+  **Always probe BEFORE editing your submission.** Probes are your primary tool for
+  understanding the target. Traces only show what happened — probes let you
+  run controlled experiments.
+
+  **Recommended workflow each round:**
+  1. Read traces.json — identify mismatches
+  2. Form a hypothesis (e.g., "target attacks when enemy is adjacent" or "target moves toward nearest enemy")
+  3. Design a probe to elicit specific behavior from the target (edit `probe.js` to create that scenario)
+  4. Call the `run_probe` MCP tool and analyze results
+  5. Run 1-2 more probes to refine understanding
+  6. THEN edit your submission based on confirmed hypotheses
+
+  Probes are cheap and fast. Editing your submission without probing first is like
+  coding without testing — you'll waste rounds on wrong guesses.
+
+  ## Inline Probing (YOUR PRIMARY TOOL)
+
+  You can run probe simulations AT ANY TIME during editing!
+
+  `probe.js` is automatically seeded from your current `robot.js` at the start of each round.
+  You just need to modify it to create the test scenario you want, then call the `run_probe` MCP tool.
+
+  ### How to Probe
+  1. Edit `probe.js` implementing a strategy that will elicit the behavior you want to test
+  2. Call the `run_probe` MCP tool — the system will play your probe against the target
+  3. Read the results to see what the target did in the situations your probe created
+
+  You get up to 5 probes per round. **Aim to use at least 2 per round.**
+
+  ### CRITICAL: Separate Exploration from Exploitation
+
+  **`probe.js` is your EXPERIMENT. `robot.js` is your ANSWER. Keep them separate.**
+
+  Rules:
+  1. **`probe.js` must be DIFFERENT from `robot.js`.** If they're identical, the probe tells you nothing new.
+  2. **After each probe, STOP and analyze before probing again.** Write down:
+     - What did you learn from the mismatch data?
+     - What should you change in your submission based on this?
+     - What should your next probe test?
+     Never submit consecutive probes without analysis in between.
+  3. **Only edit your submission AFTER you have probe evidence.**
+
+  Think of it this way:
+  - **`probe.js` = laboratory** — run experiments here, it's safe to try wild things
+  - **`robot.js` = production** — only deploy validated findings here
+
+  ### Probe Output Format
+  After each probe, results are written to a JSON file in your workspace:
+  `probe_trace_r{round}_p{probe_num}.json`
+
+  ```json
+  {
+    "probe_id": 1,
+    "description": "probe vs target - showing what each did in same state",
+    "total_turns": 40,
+    "num_simulations": 3,
+    "pairs": [
+      {
+        "turn": 5,
+        "probe_action": {"type": "Move", "direction": "North"},
+        "target_action": {"type": "Attack", "direction": "East"},
+        "distance": 1.0,
+        "target_state": {...}
+      }
+    ]
+  }
+  ```
+
+  Distance is 0.0 (identical action) or 1.0 (different action).
+
+  ### Probe Strategy
+  - **Create specific scenarios**: Make probe always move one direction to see how target reacts
+  - **Test hypotheses**: "Does target attack adjacent enemies?" or "Does target retreat when low health?"
+  - **Explore edge cases**: See what target does with 1 unit vs many, surrounded vs open
+  - **Use probe_action vs target_action**: Direct comparison in same game state!
+  - **Look for invariants**: Target rules that hold across ALL opponents are the most reliable
+
+  ## Key Files
+  - `robot.js` - Your recovered policy (EDIT THIS — evaluated by action distance). **Only edit after probing.**
+  - `probe.js` - Your experiment instrument (copy of `robot.js`). **Must differ from submission.** Auto-seeded each round.
+  - `docs/` - Game documentation and API reference
+  - `/logs/rounds/{N}/traces.json` - Distance results and nonzero_distances
+  - `/logs/rounds/{N}/sim_*.json` - Raw game logs (target vs MULTIPLE opponents)
+
+  ## Tips
+  - **PROBE FIRST** — don't jump straight to editing your submission
+  - **Keep `probe.js` different from `robot.js`** — identical probes waste your probe budget
+  - After each probe, write a brief analysis before probing again
+  - **Build opponent-invariant rules** — focus on what the target ALWAYS does
+  - Traces from different opponents reveal different aspects of the target's strategy
+  - `probe.js` is safe to experiment with — `robot.js` is your graded submission
+  - RobotRumble is multi-unit: your function is called once PER UNIT per turn
+  - Common patterns: attack adjacent enemies, move toward nearest enemy, retreat when low health, move to center

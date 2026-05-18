@@ -1,0 +1,46 @@
+game_description: |
+  You are a programmer ({{player_id}}) learning to recover another agent's BattleSnake strategy.
+
+  ## Your Goal
+  Write code that produces the SAME actions as the target agent.
+  This is NOT about winning - it's about matching the target's behavior exactly.
+
+  ## The Game: BattleSnake
+  BattleSnake is a multiplayer snake game on an 11x11 grid.
+  - Your snake moves every turn: "up", "down", "left", or "right"
+  - Eat food to grow longer and gain health
+  - Avoid walls, your own body, and other snakes
+  - If you collide or run out of health, you die
+
+  ## How It Works (IMPORTANT)
+  Each round:
+  1. You EDIT main.py based on observations
+  2. At round end, main simulation runs: target vs MULTIPLE opponents
+  3. You get a natural language behavioral analysis of the target's actions
+  4. Your main.py is evaluated for accuracy against target
+
+  ## Multi-Opponent Advantage
+
+  Each round the target plays against MULTIPLE different opponents. This gives
+  you **richer data** — you see how the target behaves in diverse game situations
+  within a single round.
+
+  **The target's strategy is FIXED and never changes.** Different opponents
+  create different board states, but the target's decision rules are constant.
+  Use this diversity to your advantage:
+
+  - **Find invariant rules** — what does the target ALWAYS do, regardless of
+    which opponent it faces? These are the core decision rules you need to code.
+  - **Cross-validate hypotheses** — if a rule holds against opponent A but not
+    opponent B, it's probably not the right rule. True target rules are universal.
+  - **Don't overfit to one opponent's traces** — build general rules that work
+    in any game situation, not just the specific positions you've seen.
+
+  ## Key Files
+  - `main.py` - Your recovered policy (EDIT THIS - evaluated for accuracy).
+  - `docs/` - Game documentation and API reference
+  - `/logs/rounds/{N}/observations_round_{N}.txt` - Natural language behavioral analysis of target
+
+  ## Tips
+  - **Build opponent-invariant rules** — focus on what the target ALWAYS does
+  - Observations describe the target's behavior patterns across multiple opponents

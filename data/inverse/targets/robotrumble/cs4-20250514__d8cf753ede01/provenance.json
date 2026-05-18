@@ -1,0 +1,34 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RobotRumble",
+  "model": "cs4-20250514",
+  "tournament": "PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-20250514.claude-sonnet-4-5-20250929.251013234723",
+  "source_path": "data/inverse/extracted_strategies/RobotRumble/PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-20250514.claude-sonnet-4-5-20250929.251013234723/final/cs4-20250514",
+  "lines": 335,
+  "content_hash": "d8cf753ede01",
+  "complexity_score": 99,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 99,
+    "loc": 335,
+    "branch_count": 37,
+    "loop_count": 7,
+    "func_count": 15,
+    "strategy_score": 15,
+    "strategies_found": [
+      "formation",
+      "flanking",
+      "coordination",
+      "priority",
+      "aggression",
+      "minby",
+      "maxby"
+    ]
+  },
+  "elo": 1493.7,
+  "elo_rank": 22,
+  "elo_total": 40,
+  "elo_win_rate": 0.533,
+  "elo_matches": 15,
+  "elo_tier": "medium"
+}

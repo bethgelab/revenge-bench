@@ -1,0 +1,31 @@
+{
+  "source": "codeclash_viewer",
+  "game": "Halite",
+  "model": "cs4-20250514",
+  "tournament": "PvpTournament.Halite.r15.s250.p2.claude-sonnet-4-20250514.qwen3-coder-plus-2025-09-23.251021075239.de47f8ac-dd6e-4683-aa45-273ee617de0f-uuid",
+  "source_path": "data/inverse/extracted_strategies/Halite/PvpTournament.Halite.r15.s250.p2.claude-sonnet-4-20250514.qwen3-coder-plus-2025-09-23.251021075239.de47f8ac-dd6e-4683-aa45-273ee617de0f-uuid/final/cs4-20250514",
+  "lines": 92,
+  "content_hash": "d9760cb345c4",
+  "complexity_score": 59.4,
+  "complexity_tier": "medium",
+  "complexity_breakdown": {
+    "total": 59.4,
+    "loc": 92,
+    "branch_count": 14,
+    "loop_count": 6,
+    "func_count": 1,
+    "strategy_score": 6,
+    "strategies_found": [
+      "expansion",
+      "production",
+      "strength",
+      "territory"
+    ]
+  },
+  "elo": 1494.4,
+  "elo_rank": 24,
+  "elo_total": 40,
+  "elo_win_rate": 0.467,
+  "elo_matches": 15,
+  "elo_tier": "medium"
+}

@@ -1,0 +1,28 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RobotRumble",
+  "model": "grok-code-fast-1",
+  "tournament": "PvpTournament.RobotRumble.r15.s1000.p2.grok-code-fast-1.o3.251006130928",
+  "source_path": "data/inverse/extracted_strategies/RobotRumble/PvpTournament.RobotRumble.r15.s1000.p2.grok-code-fast-1.o3.251006130928/final/grok-code-fast-1",
+  "lines": 134,
+  "content_hash": "ca803266a829",
+  "complexity_score": 55,
+  "complexity_tier": "medium",
+  "complexity_breakdown": {
+    "total": 55,
+    "loc": 134,
+    "branch_count": 22,
+    "loop_count": 1,
+    "func_count": 2,
+    "strategy_score": 1,
+    "strategies_found": [
+      "minby"
+    ]
+  },
+  "elo": 1419.5,
+  "elo_rank": 35,
+  "elo_total": 40,
+  "elo_win_rate": 0.0,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}

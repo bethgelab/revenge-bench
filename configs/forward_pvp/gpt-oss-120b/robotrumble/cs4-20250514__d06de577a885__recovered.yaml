@@ -1,0 +1,84 @@
+# Forward PvP: cs4-20250514__d06de577a885 — condition: recovered
+# Game: RobotRumble, OOD distance: 0.0122, best round: 1
+# Model: openai/gpt-oss-120b
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): gpt-oss-120b, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: RobotRumble
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robotrumble/cs4-20250514__d06de577a885
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-oss-120b
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RobotRumble.
+    RobotRumble is a turn-based coding battle where you program a team of robots to move, attack, and outmaneuver your opponent on a 19x19 grid.
+    Each player controls a team of Soldier units (Blue vs Red). Each unit independently executes your function, choosing to Move or Attack in a cardinal direction. The game lasts up to 100 turns.
+    Every decision is driven by your code, and victory comes from crafting logic that positions robots smartly, times attacks well, and adapts over the match.
+    NOTE: Please ensure that your code runs efficiently (under 60 seconds). Code that exceeds this run time will automatically forfeit the round.
+    Your bot is a JavaScript file `robot.js` at the top level of your workspace.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your robot team. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `robot.js`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```javascript
+    function robot(state, unit) {
+      // Select enemies as the opposite team
+      const enemies = state.objsByTeam(state.otherTeam) || [];
+      if (enemies.length === 0) {
+        // If no enemies are present, do nothing
+        return null;
+      }
+
+      // Find the closest enemy by Euclidean distance
+      let closestEnemy = enemies[0];
+      let closestDist = unit.coords.distanceTo(closestEnemy.coords);
+      for (let i = 1; i < enemies.length; i++) {
+        const d = unit.coords.distanceTo(enemies[i].coords);
+        if (d < closestDist) {
+          closestDist = d;
+          closestEnemy = enemies[i];
+        }
+      }
+
+      // Determine direction toward the closest enemy
+      const direction = unit.coords.directionTo(closestEnemy.coords);
+
+      // Attack if adjacent (distance exactly 1), otherwise move toward them
+      if (unit.coords.distanceTo(closestEnemy.coords) === 1) {
+        return Action.attack(direction);
+      } else {
+        return Action.move(direction);
+      }
+    }
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

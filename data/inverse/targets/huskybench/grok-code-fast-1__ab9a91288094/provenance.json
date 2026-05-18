@@ -1,0 +1,33 @@
+{
+  "source": "codeclash_viewer",
+  "game": "HuskyBench",
+  "model": "grok-code-fast-1",
+  "tournament": "PvpTournament.HuskyBench.r15.s100.p2.claude-sonnet-4-20250514.grok-code-fast-1.251018184400.0a6a4327-f054-4b3e-8958-ce9135aa5200-uuid",
+  "source_path": "data/inverse/extracted_strategies/HuskyBench/PvpTournament.HuskyBench.r15.s100.p2.claude-sonnet-4-20250514.grok-code-fast-1.251018184400.0a6a4327-f054-4b3e-8958-ce9135aa5200-uuid/final/grok-code-fast-1",
+  "lines": 149,
+  "content_hash": "ab9a91288094",
+  "complexity_score": 69.08,
+  "complexity_tier": "medium",
+  "complexity_breakdown": {
+    "total": 69.08,
+    "loc": 149,
+    "func_count": 7,
+    "max_nesting_depth": 7,
+    "branch_count": 34,
+    "node_count": 1207,
+    "algorithm_score": 8,
+    "algorithms_found": [
+      "hand_strength",
+      "evaluate_hand",
+      "pot_odds",
+      "range"
+    ],
+    "data_structure_score": 1
+  },
+  "elo": 1441.2,
+  "elo_rank": 36,
+  "elo_total": 40,
+  "elo_win_rate": 0.4,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}

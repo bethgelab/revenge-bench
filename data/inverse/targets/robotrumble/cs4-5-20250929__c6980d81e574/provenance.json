@@ -1,0 +1,31 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RobotRumble",
+  "model": "cs4-5-20250929",
+  "tournament": "PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-5-20250929.o3.251014202340",
+  "source_path": "data/inverse/extracted_strategies/RobotRumble/PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-5-20250929.o3.251014202340/final/cs4-5-20250929",
+  "lines": 170,
+  "content_hash": "c6980d81e574",
+  "complexity_score": 80,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 80,
+    "loc": 170,
+    "branch_count": 20,
+    "loop_count": 5,
+    "func_count": 3,
+    "strategy_score": 8,
+    "strategies_found": [
+      "formation",
+      "regroup",
+      "isolat",
+      "minby"
+    ]
+  },
+  "elo": 1564.2,
+  "elo_rank": 5,
+  "elo_total": 40,
+  "elo_win_rate": 0.667,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

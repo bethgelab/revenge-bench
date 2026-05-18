@@ -1,0 +1,44 @@
+# Forward PvP: qwen3-coder-plus-2025-09-23__8bcfd6d26453 — condition: blind
+# Game: RobotRumble, OOD distance: 0.0221, best round: 2
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): GPT-5, blind condition
+
+tournament:
+  rounds: 5
+game:
+  name: RobotRumble
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robotrumble/qwen3-coder-plus-2025-09-23__8bcfd6d26453
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-5
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RobotRumble.
+    RobotRumble is a turn-based coding battle where you program a team of robots to move, attack, and outmaneuver your opponent on a 19x19 grid.
+    Each player controls a team of Soldier units (Blue vs Red). Each unit independently executes your function, choosing to Move or Attack in a cardinal direction. The game lasts up to 100 turns.
+    Every decision is driven by your code, and victory comes from crafting logic that positions robots smartly, times attacks well, and adapts over the match.
+    NOTE: Please ensure that your code runs efficiently (under 60 seconds). Code that exceeds this run time will automatically forfeit the round.
+    Your bot is a JavaScript file `robot.js` at the top level of your workspace.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your robot team. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `robot.js`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).

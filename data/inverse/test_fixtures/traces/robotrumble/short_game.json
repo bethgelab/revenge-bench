@@ -1,0 +1,132 @@
+{
+  "winner": "Red",
+  "errors": {},
+  "turns": [
+    {
+      "state": {
+        "objs": {
+          "1": {"id": "1", "coords": [0, 0], "obj_type": "Terrain", "type": "Wall"},
+          "2": {"id": "2", "coords": [0, 1], "obj_type": "Terrain", "type": "Wall"},
+          "3": {"id": "3", "coords": [0, 2], "obj_type": "Terrain", "type": "Wall"},
+          "4": {"id": "4", "coords": [0, 3], "obj_type": "Terrain", "type": "Wall"},
+          "5": {"id": "5", "coords": [0, 4], "obj_type": "Terrain", "type": "Wall"},
+          "6": {"id": "6", "coords": [1, 0], "obj_type": "Terrain", "type": "Wall"},
+          "7": {"id": "7", "coords": [1, 4], "obj_type": "Terrain", "type": "Wall"},
+          "8": {"id": "8", "coords": [2, 0], "obj_type": "Terrain", "type": "Wall"},
+          "9": {"id": "9", "coords": [2, 4], "obj_type": "Terrain", "type": "Wall"},
+          "10": {"id": "10", "coords": [3, 0], "obj_type": "Terrain", "type": "Wall"},
+          "11": {"id": "11", "coords": [3, 4], "obj_type": "Terrain", "type": "Wall"},
+          "12": {"id": "12", "coords": [4, 0], "obj_type": "Terrain", "type": "Wall"},
+          "13": {"id": "13", "coords": [4, 1], "obj_type": "Terrain", "type": "Wall"},
+          "14": {"id": "14", "coords": [4, 2], "obj_type": "Terrain", "type": "Wall"},
+          "15": {"id": "15", "coords": [4, 3], "obj_type": "Terrain", "type": "Wall"},
+          "16": {"id": "16", "coords": [4, 4], "obj_type": "Terrain", "type": "Wall"},
+          "100": {"id": "100", "coords": [1, 1], "obj_type": "Unit", "type": "Soldier", "team": "Blue", "health": 5},
+          "101": {"id": "101", "coords": [3, 3], "obj_type": "Unit", "type": "Soldier", "team": "Red", "health": 5}
+        },
+        "turn": 1
+      },
+      "robot_actions": {
+        "100": {"Ok": {"type": "Move", "direction": "East"}},
+        "101": {"Ok": {"type": "Move", "direction": "West"}}
+      },
+      "logs": {"Red": [], "Blue": []},
+      "debug_inspect_tables": {},
+      "debug_locate_queries": {"Red": [], "Blue": []}
+    },
+    {
+      "state": {
+        "objs": {
+          "1": {"id": "1", "coords": [0, 0], "obj_type": "Terrain", "type": "Wall"},
+          "2": {"id": "2", "coords": [0, 1], "obj_type": "Terrain", "type": "Wall"},
+          "3": {"id": "3", "coords": [0, 2], "obj_type": "Terrain", "type": "Wall"},
+          "4": {"id": "4", "coords": [0, 3], "obj_type": "Terrain", "type": "Wall"},
+          "5": {"id": "5", "coords": [0, 4], "obj_type": "Terrain", "type": "Wall"},
+          "6": {"id": "6", "coords": [1, 0], "obj_type": "Terrain", "type": "Wall"},
+          "7": {"id": "7", "coords": [1, 4], "obj_type": "Terrain", "type": "Wall"},
+          "8": {"id": "8", "coords": [2, 0], "obj_type": "Terrain", "type": "Wall"},
+          "9": {"id": "9", "coords": [2, 4], "obj_type": "Terrain", "type": "Wall"},
+          "10": {"id": "10", "coords": [3, 0], "obj_type": "Terrain", "type": "Wall"},
+          "11": {"id": "11", "coords": [3, 4], "obj_type": "Terrain", "type": "Wall"},
+          "12": {"id": "12", "coords": [4, 0], "obj_type": "Terrain", "type": "Wall"},
+          "13": {"id": "13", "coords": [4, 1], "obj_type": "Terrain", "type": "Wall"},
+          "14": {"id": "14", "coords": [4, 2], "obj_type": "Terrain", "type": "Wall"},
+          "15": {"id": "15", "coords": [4, 3], "obj_type": "Terrain", "type": "Wall"},
+          "16": {"id": "16", "coords": [4, 4], "obj_type": "Terrain", "type": "Wall"},
+          "100": {"id": "100", "coords": [2, 1], "obj_type": "Unit", "type": "Soldier", "team": "Blue", "health": 5},
+          "101": {"id": "101", "coords": [2, 3], "obj_type": "Unit", "type": "Soldier", "team": "Red", "health": 5}
+        },
+        "turn": 2
+      },
+      "robot_actions": {
+        "100": {"Ok": {"type": "Move", "direction": "North"}},
+        "101": {"Ok": {"type": "Attack", "direction": "South"}}
+      },
+      "logs": {"Red": [], "Blue": []},
+      "debug_inspect_tables": {},
+      "debug_locate_queries": {"Red": [], "Blue": []}
+    },
+    {
+      "state": {
+        "objs": {
+          "1": {"id": "1", "coords": [0, 0], "obj_type": "Terrain", "type": "Wall"},
+          "2": {"id": "2", "coords": [0, 1], "obj_type": "Terrain", "type": "Wall"},
+          "3": {"id": "3", "coords": [0, 2], "obj_type": "Terrain", "type": "Wall"},
+          "4": {"id": "4", "coords": [0, 3], "obj_type": "Terrain", "type": "Wall"},
+          "5": {"id": "5", "coords": [0, 4], "obj_type": "Terrain", "type": "Wall"},
+          "6": {"id": "6", "coords": [1, 0], "obj_type": "Terrain", "type": "Wall"},
+          "7": {"id": "7", "coords": [1, 4], "obj_type": "Terrain", "type": "Wall"},
+          "8": {"id": "8", "coords": [2, 0], "obj_type": "Terrain", "type": "Wall"},
+          "9": {"id": "9", "coords": [2, 4], "obj_type": "Terrain", "type": "Wall"},
+          "10": {"id": "10", "coords": [3, 0], "obj_type": "Terrain", "type": "Wall"},
+          "11": {"id": "11", "coords": [3, 4], "obj_type": "Terrain", "type": "Wall"},
+          "12": {"id": "12", "coords": [4, 0], "obj_type": "Terrain", "type": "Wall"},
+          "13": {"id": "13", "coords": [4, 1], "obj_type": "Terrain", "type": "Wall"},
+          "14": {"id": "14", "coords": [4, 2], "obj_type": "Terrain", "type": "Wall"},
+          "15": {"id": "15", "coords": [4, 3], "obj_type": "Terrain", "type": "Wall"},
+          "16": {"id": "16", "coords": [4, 4], "obj_type": "Terrain", "type": "Wall"},
+          "100": {"id": "100", "coords": [2, 2], "obj_type": "Unit", "type": "Soldier", "team": "Blue", "health": 4},
+          "101": {"id": "101", "coords": [2, 3], "obj_type": "Unit", "type": "Soldier", "team": "Red", "health": 5}
+        },
+        "turn": 3
+      },
+      "robot_actions": {
+        "100": {"Ok": {"type": "Attack", "direction": "North"}},
+        "101": {"Ok": {"type": "Attack", "direction": "South"}}
+      },
+      "logs": {"Red": [], "Blue": []},
+      "debug_inspect_tables": {},
+      "debug_locate_queries": {"Red": [], "Blue": []}
+    },
+    {
+      "state": {
+        "objs": {
+          "1": {"id": "1", "coords": [0, 0], "obj_type": "Terrain", "type": "Wall"},
+          "2": {"id": "2", "coords": [0, 1], "obj_type": "Terrain", "type": "Wall"},
+          "3": {"id": "3", "coords": [0, 2], "obj_type": "Terrain", "type": "Wall"},
+          "4": {"id": "4", "coords": [0, 3], "obj_type": "Terrain", "type": "Wall"},
+          "5": {"id": "5", "coords": [0, 4], "obj_type": "Terrain", "type": "Wall"},
+          "6": {"id": "6", "coords": [1, 0], "obj_type": "Terrain", "type": "Wall"},
+          "7": {"id": "7", "coords": [1, 4], "obj_type": "Terrain", "type": "Wall"},
+          "8": {"id": "8", "coords": [2, 0], "obj_type": "Terrain", "type": "Wall"},
+          "9": {"id": "9", "coords": [2, 4], "obj_type": "Terrain", "type": "Wall"},
+          "10": {"id": "10", "coords": [3, 0], "obj_type": "Terrain", "type": "Wall"},
+          "11": {"id": "11", "coords": [3, 4], "obj_type": "Terrain", "type": "Wall"},
+          "12": {"id": "12", "coords": [4, 0], "obj_type": "Terrain", "type": "Wall"},
+          "13": {"id": "13", "coords": [4, 1], "obj_type": "Terrain", "type": "Wall"},
+          "14": {"id": "14", "coords": [4, 2], "obj_type": "Terrain", "type": "Wall"},
+          "15": {"id": "15", "coords": [4, 3], "obj_type": "Terrain", "type": "Wall"},
+          "16": {"id": "16", "coords": [4, 4], "obj_type": "Terrain", "type": "Wall"},
+          "101": {"id": "101", "coords": [2, 3], "obj_type": "Unit", "type": "Soldier", "team": "Red", "health": 4}
+        },
+        "turn": 4
+      },
+      "robot_actions": {
+        "101": {"Ok": null}
+      },
+      "logs": {"Red": [], "Blue": []},
+      "debug_inspect_tables": {},
+      "debug_locate_queries": {"Red": [], "Blue": []}
+    }
+  ]
+}

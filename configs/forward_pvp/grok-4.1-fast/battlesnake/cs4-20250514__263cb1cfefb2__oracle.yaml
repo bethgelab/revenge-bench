@@ -1,0 +1,311 @@
+# Forward PvP: cs4-20250514__263cb1cfefb2 — condition: oracle
+# Game: BattleSnake, OOD distance: 0.0154, best round: 5
+# Model: openai/grok-4.1-fast
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): grok-4.1-fast, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/cs4-20250514__263cb1cfefb2
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/grok-4.1-fast
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    # Welcome to
+    # __________         __    __  .__                               __
+    # \______   \_____ _/  |__/  |_|  |   ____   ______ ____ _____  |  | __ ____
+    #  |    |  _/\__  \\   __\   __\  | _/ __ \ /  ___//    \\__  \ |  |/ // __ \
+    #  |    |   \ / __ \|  |  |  | |  |_\  ___/ \___ \|   |  \/ __ \|    <\  ___/
+    #  |________/(______/__|  |__| |____/\_____>______>___|__(______/__|__\\_____>
+    #
+    # This file can be a nice home for your Battlesnake logic and helper functions.
+    #
+    # To get you started we've included code to prevent your Battlesnake from moving backwards.
+    # For more info see docs.battlesnake.com
+
+    import random
+    import typing
+    from collections import deque
+
+
+    # info is called when you create your Battlesnake on play.battlesnake.com
+    # and controls your Battlesnake's appearance
+    # TIP: If you open your Battlesnake URL in a browser you should see this data
+    def info() -> typing.Dict:
+        print("INFO")
+
+        return {
+            "apiversion": "1",
+            "author": "claude-sonnet-4-20250514",  # Updated author
+            "color": "#FF6B35",  # Updated to a more vibrant color
+            "head": "default",
+            "tail": "default",
+        }
+
+
+    # start is called when your Battlesnake begins a game
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+
+    # end is called when your Battlesnake finishes a game
+    def end(game_state: typing.Dict):
+        print("GAME OVER\n")
+
+
+    def get_next_position(head: typing.Dict, move: str) -> typing.Dict:
+        """Calculate the next position given current head and move direction"""
+        next_pos = {"x": head["x"], "y": head["y"]}
+
+        if move == "up":
+            next_pos["y"] += 1
+        elif move == "down":
+            next_pos["y"] -= 1
+        elif move == "left":
+            next_pos["x"] -= 1
+        elif move == "right":
+            next_pos["x"] += 1
+
+        return next_pos
+
+
+    def is_position_safe(pos: typing.Dict, game_state: typing.Dict) -> bool:
+        """Check if a position is safe (no collisions, within bounds)"""
+        board_width = game_state['board']['width']
+        board_height = game_state['board']['height']
+
+        # Check boundaries
+        if pos["x"] < 0 or pos["x"] >= board_width or pos["y"] < 0 or pos["y"] >= board_height:
+            return False
+
+        # Check collision with our own body (excluding tail which will move)
+        my_body = game_state['you']['body'][:-1]  # Exclude tail
+        for body_part in my_body:
+            if pos["x"] == body_part["x"] and pos["y"] == body_part["y"]:
+                return False
+
+        # Check collision with other snakes
+        for snake in game_state['board']['snakes']:
+            if snake['id'] == game_state['you']['id']:
+                continue  # Skip our own snake
+
+            # Check collision with other snake's body
+            for body_part in snake['body']:
+                if pos["x"] == body_part["x"] and pos["y"] == body_part["y"]:
+                    return False
+
+        return True
+
+
+    def flood_fill_space(start_pos: typing.Dict, game_state: typing.Dict) -> int:
+        """
+        Use flood fill to calculate available space from a starting position.
+        Returns the number of reachable empty squares.
+        """
+        board_width = game_state['board']['width']
+        board_height = game_state['board']['height']
+
+        # Create a set of occupied positions
+        occupied = set()
+
+        # Add all snake bodies (excluding tails that will move)
+        for snake in game_state['board']['snakes']:
+            for i, body_part in enumerate(snake['body']):
+                # Don't count the tail as occupied since it will move
+                if i < len(snake['body']) - 1:
+                    occupied.add((body_part["x"], body_part["y"]))
+
+        # BFS to count reachable spaces
+        visited = set()
+        queue = deque([(start_pos["x"], start_pos["y"])])
+        visited.add((start_pos["x"], start_pos["y"]))
+
+        reachable_count = 0
+
+        while queue:
+            x, y = queue.popleft()
+            reachable_count += 1
+
+            # Check all 4 directions
+            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                new_x, new_y = x + dx, y + dy
+
+                # Check bounds
+                if new_x < 0 or new_x >= board_width or new_y < 0 or new_y >= board_height:
+                    continue
+
+                # Check if already visited
+                if (new_x, new_y) in visited:
+                    continue
+
+                # Check if occupied
+                if (new_x, new_y) in occupied:
+                    continue
+
+                visited.add((new_x, new_y))
+                queue.append((new_x, new_y))
+
+        return reachable_count
+
+
+    def find_closest_food(head: typing.Dict, food_list: typing.List) -> typing.Dict:
+        """Find the closest food using Manhattan distance"""
+        if not food_list:
+            return None
+
+        closest_food = None
+        min_distance = float('inf')
+
+        for food in food_list:
+            distance = abs(head["x"] - food["x"]) + abs(head["y"] - food["y"])
+            if distance < min_distance:
+                min_distance = distance
+                closest_food = food
+
+        return closest_food
+
+
+    def get_move_towards_food(head: typing.Dict, food: typing.Dict) -> typing.List[str]:
+        """Get the best moves to approach food"""
+        moves = []
+
+        # Prioritize moves that get us closer to food
+        if food["x"] > head["x"]:
+            moves.append("right")
+        elif food["x"] < head["x"]:
+            moves.append("left")
+
+        if food["y"] > head["y"]:
+            moves.append("up")
+        elif food["y"] < head["y"]:
+            moves.append("down")
+
+        return moves
+
+
+    def evaluate_move_with_space(head: typing.Dict, move: str, game_state: typing.Dict) -> typing.Dict:
+        """
+        Evaluate a move considering both safety and available space.
+        Returns a dict with move evaluation metrics.
+        """
+        next_pos = get_next_position(head, move)
+
+        evaluation = {
+            "move": move,
+            "safe": is_position_safe(next_pos, game_state),
+            "space": 0,
+            "food_distance": float('inf')
+        }
+
+        if evaluation["safe"]:
+            # Calculate available space using flood fill
+            evaluation["space"] = flood_fill_space(next_pos, game_state)
+
+            # Calculate distance to closest food
+            food_list = game_state['board']['food']
+            if food_list:
+                closest_food = find_closest_food(next_pos, food_list)
+                if closest_food:
+                    evaluation["food_distance"] = abs(next_pos["x"] - closest_food["x"]) + abs(next_pos["y"] - closest_food["y"])
+
+        return evaluation
+
+
+    # move is called on every turn and returns your next move
+    # Valid moves are "up", "down", "left", or "right"
+    # See https://docs.battlesnake.com/api/example-move for available data
+    def move(game_state: typing.Dict) -> typing.Dict:
+
+        is_move_safe = {"up": True, "down": True, "left": True, "right": True}
+
+        # We've included code to prevent your Battlesnake from moving backwards
+        my_head = game_state["you"]["body"][0]  # Coordinates of your head
+        my_neck = game_state["you"]["body"][1]  # Coordinates of your "neck"
+
+        if my_neck["x"] < my_head["x"]:  # Neck is left of head, don't move left
+            is_move_safe["left"] = False
+
+        elif my_neck["x"] > my_head["x"]:  # Neck is right of head, don't move right
+            is_move_safe["right"] = False
+
+        elif my_neck["y"] < my_head["y"]:  # Neck is below head, don't move down
+            is_move_safe["down"] = False
+
+        elif my_neck["y"] > my_head["y"]:  # Neck is above head, don't move up
+            is_move_safe["up"] = False
+
+        # Evaluate all possible moves with space analysis
+        move_evaluations = []
+        for move_direction in ["up", "down", "left", "right"]:
+            if is_move_safe[move_direction]:
+                evaluation = evaluate_move_with_space(my_head, move_direction, game_state)
+                if evaluation["safe"]:
+                    move_evaluations.append(evaluation)
+
+        if len(move_evaluations) == 0:
+            print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
+            return {"move": "down"}
+
+        # Sort moves by available space (descending), then by food distance (ascending)
+        move_evaluations.sort(key=lambda x: (-x["space"], x["food_distance"]))
+
+        # Get the best moves (those with the most space)
+        best_space = move_evaluations[0]["space"]
+        best_moves = [eval for eval in move_evaluations if eval["space"] == best_space]
+
+        # If we have multiple moves with the same best space, prefer the one closest to food
+        if len(best_moves) > 1:
+            # Among moves with best space, choose the one closest to food
+            best_moves.sort(key=lambda x: x["food_distance"])
+            chosen_move = best_moves[0]["move"]
+            print(f"MOVE {game_state['turn']}: Moving {chosen_move} (space: {best_moves[0]['space']}, food_dist: {best_moves[0]['food_distance']:.1f})")
+        else:
+            chosen_move = best_moves[0]["move"]
+            print(f"MOVE {game_state['turn']}: Moving {chosen_move} (space: {best_moves[0]['space']}, food_dist: {best_moves[0]['food_distance']:.1f})")
+
+        return {"move": chosen_move}
+
+
+    # Start server when `python main.py` is run
+    if __name__ == "__main__":
+        from server import run_server
+
+        run_server({"info": info, "start": start, "move": move, "end": end})
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

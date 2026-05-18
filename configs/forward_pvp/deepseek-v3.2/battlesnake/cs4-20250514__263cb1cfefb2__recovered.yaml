@@ -1,0 +1,171 @@
+# Forward PvP: cs4-20250514__263cb1cfefb2 -- condition: recovered
+# Game: BattleSnake, OOD distance: 0.0154, best round: 5
+# Model: openai/deepseek-v3.2
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): deepseek-v3.2, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/cs4-20250514__263cb1cfefb2
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/deepseek-v3.2
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    import typing
+
+    def info() -> typing.Dict:
+        return {
+            "apiversion": "1",
+            "author": "learner",
+            "color": "#888888",
+            "head": "default",
+            "tail": "default",
+        }
+
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+    def end(game_state: typing.Dict):
+        print("GAME OVER\n")
+
+    DIRS = {"up": (0,1), "down": (0,-1), "left": (-1,0), "right": (1,0)}
+    TIE_ORDER = ["up","down","left","right"]
+
+    def in_bounds(x:int, y:int, w:int, h:int) -> bool:
+        return 0 <= x < w and 0 <= y < h
+
+    def move(game_state: typing.Dict) -> typing.Dict:
+        you = game_state["you"]
+        board = game_state["board"]
+        head = you["head"]
+        body = you["body"]
+        width = board["width"]; height = board["height"]
+        foods = board.get("food", [])
+
+        # Prevent moving back into the neck
+        is_move_safe = {"up": True, "down": True, "left": True, "right": True}
+        if len(body) > 1:
+            neck = body[1]
+            if neck["x"] < head["x"]:
+                is_move_safe["left"] = False
+            elif neck["x"] > head["x"]:
+                is_move_safe["right"] = False
+            elif neck["y"] < head["y"]:
+                is_move_safe["down"] = False
+            elif neck["y"] > head["y"]:
+                is_move_safe["up"] = False
+
+        # Prevent moving out of bounds
+        for m,(dx,dy) in DIRS.items():
+            nx, ny = head["x"]+dx, head["y"]+dy
+            if not in_bounds(nx, ny, width, height):
+                is_move_safe[m] = False
+
+        # Prevent moving into any snake body (including own)
+        occupied = set()
+        for s in board.get("snakes", []):
+            for seg in s.get("body", []):
+                occupied.add((seg["x"], seg["y"]))
+        for m,(dx,dy) in DIRS.items():
+            nx, ny = head["x"]+dx, head["y"]+dy
+            if (nx, ny) in occupied and not (((len(body) > 0 and body[-1]["x"] == nx and body[-1]["y"] == ny)) and not any(f["x"] == nx and f["y"] == ny for f in foods)):
+                is_move_safe[m] = False
+
+        # Avoid head-to-head risk: do not move into a square adjacent to an equal/longer opponent head
+        my_len = you.get("length", len(body))
+        risky_heads = []
+        for s in board.get("snakes", []):
+            if s.get("id") == you.get("id"):
+                continue
+            if s.get("length", 0) >= my_len:
+                risky_heads.append((s["head"]["x"], s["head"]["y"]))
+        if False and risky_heads:
+            for m,(dx,dy) in DIRS.items():
+                if not is_move_safe.get(m, False):
+                    continue
+                nx, ny = head["x"]+dx, head["y"]+dy
+                for hx,hy in risky_heads:
+                    if abs(hx - nx) + abs(hy - ny) == 1:
+                        is_move_safe[m] = False
+                        break
+
+        # Collect safe moves
+        safe_moves = [m for m,s in is_move_safe.items() if s]
+
+        if not safe_moves:
+            # No safe moves detected; default fallback
+            return {"move": "down"}
+
+        # If there is food, move to minimize Manhattan distance to nearest food
+        if foods:
+            best_dist = None
+            best_moves = set()
+            for m in ["up","down","left","right"]:
+                if m not in safe_moves:
+                    continue
+                dx,dy = DIRS[m]
+                nx, ny = head["x"]+dx, head["y"]+dy
+                if not in_bounds(nx, ny, width, height):
+                    continue
+                dist = min(abs(nx - f["x"]) + abs(ny - f["y"]) for f in foods)
+                if best_dist is None or dist < best_dist:
+                    best_dist = dist
+                    best_moves = {m}
+                elif dist == best_dist:
+                    best_moves.add(m)
+            if best_moves:
+                for pref in TIE_ORDER:
+                    if pref in best_moves:
+                        return {"move": pref}
+                return {"move": sorted(best_moves)[0]}
+
+        # If no food or no best move computed, choose by preference among safe moves
+        for pref in TIE_ORDER:
+            if pref in safe_moves:
+                return {"move": pref}
+
+        # Final fallback (shouldn't occur)
+        return {"move": safe_moves[0]}
+
+    if __name__ == "__main__":
+        from server import run_server
+        run_server({"info": info, "start": start, "move": move, "end": end})
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

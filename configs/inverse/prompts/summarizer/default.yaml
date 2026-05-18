@@ -1,0 +1,134 @@
+# Summarizer prompts — used by observation_summarizer.py to generate NL observations.
+# These define how the LLM summarizer interprets and describes target behavior.
+
+system_prompt: |
+  You are an expert game analyst. You observe a player (called "the target")
+  playing a game against various opponents. Your job is to describe the target's
+  behavioral patterns, decision-making tendencies, and strategy in natural language.
+
+  Context: We are trying to understand the target's strategy by comparing its
+  actions against a current best-guess hypothesis. The state-action pairs shown
+  below are cases where the hypothesis predicted a DIFFERENT action than what the
+  target actually chose — i.e., these are the situations we still don't understand
+  well. Your job is to analyze what the target is actually doing in these situations.
+
+  Rules:
+  - Focus ONLY on the target's behavior and decisions.
+  - Do NOT mention the hypothesis, learner, distance, or any evaluation machinery.
+  - Do NOT mention opponent names or identities.
+  - Do NOT speculate about implementation details or code.
+  - Describe observable patterns: what the target does in response to game states.
+  {game_hints}
+
+user_prompt_template: |
+  {game_context}
+
+  ## Observation Data
+
+  Below is the target's behavior across {num_sims} games against different opponents
+  this round. You are given:
+  1. Aggregate statistics summarizing how many actions were observed and how many
+     remain unexplained (i.e., the current hypothesis chose differently from the target).
+  2. A frequency table of the target's most common actions among the unexplained cases.
+  3. State-action pairs showing the game state and what the target actually did.
+     These are the cases where the target's action was NOT correctly predicted —
+     use them to identify *situational* patterns (e.g., "when X happens, the target does Y").
+
+  {observation_data}
+
+  ## Task
+
+  Write a detailed behavioral analysis of the target. Describe:
+  1. **Decision patterns** — What does the target tend to do in common situations?
+  2. **Priorities** — What does the target seem to prioritize (e.g., food, safety, aggression)?
+  3. **Reactions** — How does the target respond to threats or opportunities?
+  4. **Consistent rules** — What behaviors appear consistent across all games?
+
+  Ground your analysis in the state-action pairs — cite specific situations.
+  Do NOT mention the hypothesis, learner, or distance metrics in your output.
+  Just describe what the target is doing and why.
+  Write 300-600 words.
+
+# Per-game context blocks — injected as {game_context} in the user prompt.
+# These match the game descriptions used in the default learner prompts.
+game_contexts:
+  BattleSnake: |
+    ## Game: BattleSnake
+    BattleSnake is a multiplayer snake game on an 11x11 grid.
+    - Your snake moves every turn: "up", "down", "left", or "right"
+    - Eat food to grow longer and gain health
+    - Avoid walls, your own body, and other snakes
+    - If you collide or run out of health, you die
+    - Head-to-head: longer snake wins; equal length = both die
+
+    Actions: one of "up", "down", "left", "right" each turn.
+
+  Halite: |
+    ## Game: Halite
+    Halite is a multi-player turn-based strategy game on a rectangular grid.
+    - Players control pieces that move to capture territory and accumulate strength
+    - Each cell has production value that increases the strength of occupying pieces
+    - Pieces can move in 4 directions (north, east, south, west) or stay still
+    - Combat: when pieces from different players collide, strength determines the winner
+    - Goal: control the most territory by end of game
+
+    Actions are lists of [row, col, move] triples — one per owned cell.
+    Move values: 0=STILL, 1=NORTH, 2=EAST, 3=SOUTH, 4=WEST.
+
+  RobotRumble: |
+    ## Game: RobotRumble
+    RobotRumble is a turn-based robot battle game on a 19x19 grid.
+    - You control a team of robots (each is a "Soldier" unit with health points)
+    - Two teams: Blue and Red, each starting with multiple units
+    - Game lasts up to 100 turns
+    - Each turn, every unit executes independently
+
+    Actions per unit:
+    - {type: "Move", direction: "North"|"South"|"East"|"West"} — move 1 cell
+    - {type: "Attack", direction: "North"|"South"|"East"|"West"} — attack adjacent cell
+
+  RoboCode: |
+    ## Game: RoboCode
+    RoboCode is a programming game on an 800×600 battlefield.
+    Your code controls a tank that must decide how to move, aim, and fire each turn.
+    The game is deterministic and turn-based.
+
+    Actions (5-component output) each turn:
+    - velocity: speed [-8, 8] px/turn
+    - turn_body: body rotation [-10, 10] degrees/turn
+    - turn_gun: gun rotation [-20, 20] degrees/turn
+    - turn_radar: radar rotation [-45, 45] degrees/turn
+    - fire_power: bullet power [0, 3] (0 = don't fire)
+
+  HuskyBench: |
+    ## Game: HuskyBench (Poker)
+    HuskyBench is a heads-up No-Limit Texas Hold'em poker game.
+    - Each hand: you get 2 hole cards, then community cards are revealed over 4 rounds
+    - Betting rounds: preflop, flop (3 cards), turn (4 cards), river (5 cards)
+    - Actions: FOLD, CHECK, CALL, or RAISE:<ratio>
+    - Raise ratio: amount / player_stack, a float in (0, 1] (1.0 = all-in)
+    - Starting stack: 10,000 chips
+
+# Per-game hints for the system prompt — injected as {game_hints}.
+# These guide the summarizer on what patterns to look for in each game.
+game_hints:
+  BattleSnake: |
+    - In states: the target snake has name="target" in board.snakes; opponents have name="opponent".
+    - Be specific about situations and actions (e.g., "when food is one cell away and health is low, the target moves toward food").
+    - Organize your observations into clear categories (e.g., food-seeking, wall avoidance, head-to-head aggression, body navigation).
+  Halite: |
+    - In states: "my_cells" ([row, col, strength, production]) are the target's cells; "opponent_cell_count" and "opponent_total_strength" summarize the opponent.
+    - Be specific about situations and actions (e.g., "pieces with low strength tend to stay still to accumulate production").
+    - Organize your observations into clear categories (e.g., expansion, combat, territory consolidation, strength management).
+  RobotRumble: |
+    - In states: "my_units" are the target's units; "enemy_units" are the opponent's.
+    - Be specific about situations and actions (e.g., "when an enemy unit is adjacent, the target attacks rather than moves").
+    - Organize your observations into clear categories (e.g., positioning, aggression, retreat, team coordination).
+  RoboCode: |
+    - In states: "my_*" fields (my_x, my_y, my_energy, etc.) are the target's tank; "enemy_*" fields are the opponent's.
+    - Be specific about situations and actions (e.g., "when the enemy is far away, the target increases velocity and closes distance").
+    - Organize your observations into clear categories (e.g., movement/dodging, targeting/aiming, firing decisions, radar usage).
+  HuskyBench: |
+    - In states: "my_stack" and "hole_cards" are the target's; "opponent_stacks" are the opponent's.
+    - Be specific about situations and actions (e.g., "preflop with suited connectors, the target raises small; with weak hands, it folds").
+    - Organize your observations into clear categories (e.g., preflop strategy, postflop aggression, bluffing, bet sizing).

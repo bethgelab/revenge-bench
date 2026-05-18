@@ -1,0 +1,175 @@
+# Forward PvP: grok-code-fast-1__e2d9c3c435ba — condition: recovered
+# Game: BattleSnake, OOD distance: 0.0763, best round: 1
+# Model: openai/gpt-oss-120b
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): gpt-oss-120b, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/grok-code-fast-1__e2d9c3c435ba
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-oss-120b
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    # Battlesnake learner policy implementing recovered target behavior:
+    # - Compute safe moves: in-bounds, avoid moving into neck (no-backwards),
+    #   and avoid all body squares (self and opponents) — no tail allowance.
+    # - Choose a single target food: nearest by Manhattan distance from current head,
+    #   ties broken by input order.
+    # - Move toward that food by selecting a safe move that strictly reduces the
+    #   distance to the chosen food. If multiple reduce, tie-break with priority:
+    #   Up > Down > Left > Right.
+    # - If no food or no reducing move is available, choose the first safe move
+    #   in the same priority order. If no safe moves, return "down".
+
+    import typing
+
+    PRIORITY = ["up", "down", "left", "right"]
+    DIRS = {
+        "up":   (0, 1),
+        "down": (0, -1),
+        "left": (-1, 0),
+        "right":(1, 0),
+    }
+
+    def info() -> typing.Dict:
+        print("INFO")
+        return {
+            "apiversion": "1",
+            "author": "learner",
+            "color": "#888888",
+            "head": "default",
+            "tail": "default",
+        }
+
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+    def end(game_state: typing.Dict):
+        print("GAME OVER\n")
+
+    def _allowed_moves_full_avoid(game_state: typing.Dict):
+        board = game_state["board"]
+        width, height = board["width"], board["height"]
+        you = game_state["you"]
+        hx, hy = you["head"]["x"], you["head"]["y"]
+        neck = you["body"][1] if len(you["body"]) > 1 else None
+
+        # Occupied squares by all snakes' bodies (including our own)
+        occupied = set()
+        for s in board["snakes"]:
+            for seg in s["body"]:
+                occupied.add((seg["x"], seg["y"]))
+
+        safe = []
+        for mv, (dx, dy) in DIRS.items():
+            nx, ny = hx + dx, hy + dy
+            # In bounds
+            if not (0 <= nx < width and 0 <= ny < height):
+                continue
+            # No moving into neck (no-backwards)
+            if neck and nx == neck["x"] and ny == neck["y"]:
+                continue
+            # Avoid any occupied cell (full body avoidance)
+            if (nx, ny) in occupied:
+                continue
+            safe.append(mv)
+        return safe, (hx, hy)
+
+    def _pick_nearest_food(foods, hx, hy):
+        if not foods:
+            return None
+        # Choose food with minimal Manhattan distance from current head.
+        # Ties broken by list order (input order preserved).
+        best_d = None
+        best_f = None
+        for f in foods:
+            d = abs(hx - f["x"]) + abs(hy - f["y"])
+            if best_d is None or d < best_d:
+                best_d = d
+                best_f = f
+        return best_f
+
+    def move(game_state: typing.Dict) -> typing.Dict:
+        # Determine safe moves
+        safe_moves, (hx, hy) = _allowed_moves_full_avoid(game_state)
+
+        if not safe_moves:
+            print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
+            return {"move": "down"}
+
+        foods = game_state["board"].get("food", [])
+
+        # Select nearest food and move toward it
+        if foods:
+            target = _pick_nearest_food(foods, hx, hy)
+            if target is not None:
+                curd = abs(hx - target["x"]) + abs(hy - target["y"])
+                reducing = []
+                for mv in safe_moves:
+                    dx, dy = DIRS[mv]
+                    nx, ny = hx + dx, hy + dy
+                    nd = abs(nx - target["x"]) + abs(ny - target["y"])
+                    if nd < curd:
+                        reducing.append(mv)
+                if reducing:
+                    for mv in PRIORITY:
+                        if mv in reducing:
+                            print(f"MOVE {game_state['turn']}: {mv} (toward chosen food)")
+                            return {"move": mv}
+                # If no reducing move, fall through to priority among safe
+
+        # Fallback: deterministic priority among safe moves
+        for mv in PRIORITY:
+            if mv in safe_moves:
+                print(f"MOVE {game_state['turn']}: {mv} (priority fallback)")
+                return {"move": mv}
+
+        # Should not reach here; return the first safe move as a last resort
+        next_move = safe_moves[0]
+        print(f"MOVE {game_state['turn']}: {next_move} (fallback)")
+        return {"move": next_move}
+
+    # Start server when `python main.py` is run
+    if __name__ == "__main__":
+        from server import run_server
+        run_server({"info": info, "start": start, "move": move, "end": end})
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

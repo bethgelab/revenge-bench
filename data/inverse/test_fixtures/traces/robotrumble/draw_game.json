@@ -1,0 +1,49 @@
+{
+  "winner": null,
+  "errors": {},
+  "turns": [
+    {
+      "state": {
+        "objs": {
+          "1": {"id": "1", "coords": [0, 0], "obj_type": "Terrain", "type": "Wall"},
+          "2": {"id": "2", "coords": [0, 1], "obj_type": "Terrain", "type": "Wall"},
+          "3": {"id": "3", "coords": [0, 2], "obj_type": "Terrain", "type": "Wall"},
+          "4": {"id": "4", "coords": [1, 0], "obj_type": "Terrain", "type": "Wall"},
+          "5": {"id": "5", "coords": [1, 2], "obj_type": "Terrain", "type": "Wall"},
+          "6": {"id": "6", "coords": [2, 0], "obj_type": "Terrain", "type": "Wall"},
+          "7": {"id": "7", "coords": [2, 1], "obj_type": "Terrain", "type": "Wall"},
+          "8": {"id": "8", "coords": [2, 2], "obj_type": "Terrain", "type": "Wall"},
+          "100": {"id": "100", "coords": [1, 1], "obj_type": "Unit", "type": "Soldier", "team": "Blue", "health": 1},
+          "101": {"id": "101", "coords": [1, 1], "obj_type": "Unit", "type": "Soldier", "team": "Red", "health": 1}
+        },
+        "turn": 1
+      },
+      "robot_actions": {
+        "100": {"Ok": {"type": "Attack", "direction": "North"}},
+        "101": {"Ok": {"type": "Attack", "direction": "South"}}
+      },
+      "logs": {"Red": [], "Blue": []},
+      "debug_inspect_tables": {},
+      "debug_locate_queries": {"Red": [], "Blue": []}
+    },
+    {
+      "state": {
+        "objs": {
+          "1": {"id": "1", "coords": [0, 0], "obj_type": "Terrain", "type": "Wall"},
+          "2": {"id": "2", "coords": [0, 1], "obj_type": "Terrain", "type": "Wall"},
+          "3": {"id": "3", "coords": [0, 2], "obj_type": "Terrain", "type": "Wall"},
+          "4": {"id": "4", "coords": [1, 0], "obj_type": "Terrain", "type": "Wall"},
+          "5": {"id": "5", "coords": [1, 2], "obj_type": "Terrain", "type": "Wall"},
+          "6": {"id": "6", "coords": [2, 0], "obj_type": "Terrain", "type": "Wall"},
+          "7": {"id": "7", "coords": [2, 1], "obj_type": "Terrain", "type": "Wall"},
+          "8": {"id": "8", "coords": [2, 2], "obj_type": "Terrain", "type": "Wall"}
+        },
+        "turn": 2
+      },
+      "robot_actions": {},
+      "logs": {"Red": [], "Blue": []},
+      "debug_inspect_tables": {},
+      "debug_locate_queries": {"Red": [], "Blue": []}
+    }
+  ]
+}

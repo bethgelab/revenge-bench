@@ -1,0 +1,190 @@
+# Forward PvP: o3__f7034e6c2071 -- condition: recovered
+# Game: Halite, OOD distance: 0.2282, best round: 4
+# Model: openai/kimi-k2.6
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): kimi-k2.6, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: Halite
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/halite/o3__f7034e6c2071
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/kimi-k2.6
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called Halite.
+    Halite is a multi-player turn-based strategy game where bots compete on a rectangular grid to capture territory and accumulate strength.
+    Players control pieces that can move across the map to conquer neutral and enemy territory, with each cell providing production that increases the strength of pieces occupying it.
+    The goal is to control the most territory by the end of the game through strategic expansion, consolidation of forces, and tactical combat decisions.
+
+    You have the choice of writing your Halite bot in one of four programming languages: C, C++, OCaml, or Rust.
+    Example implementations can be found under the `airesources/` folder.
+    Your submission should be stored in the `submission/` folder. This folder currently contains an example C bot, but feel free to use any of the supported languages.
+    Please make sure your main file is named `main.<ext>`, where `<ext>` is the appropriate file extension for your chosen programming language.
+    You may include additional files as needed, but please ensure:
+    1. The `submission/` folder contains only files relevant to your bot.
+    2. The `submission/` folder ONLY contains a single bot (no multiple bots in one submission).
+    3. Your bot can be compiled. See `runGame.sh` under the corresponding `submission/<language>/` folder to see how we will compile and run your bot.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your bot. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is in `submission/`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```c
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <time.h>
+
+    #include "hlt.h"
+
+    #define BOT_NAME "HeuristicLearnerCBot"
+
+    // Direction helpers
+    static int dx_for_dir(int dir) {
+        switch (dir) {
+            case NORTH: return 0;
+            case EAST:  return 1;
+            case SOUTH: return 0;
+            case WEST:  return -1;
+            default:    return 0;
+        }
+    }
+    static int dy_for_dir(int dir) {
+        switch (dir) {
+            case NORTH: return -1;
+            case EAST:  return 0;
+            case SOUTH: return 1;
+            case WEST:  return 0;
+            default:    return 0;
+        }
+    }
+    static inline int wrap_x(int x, int w) {
+        if (x < 0) x += ((-x) / w + 1) * w;
+        return x % w;
+    }
+    static inline int wrap_y(int y, int h) {
+        if (y < 0) y += ((-y) / h + 1) * h;
+        return y % h;
+    }
+
+    // Find production at the nearest non-owned tile along a given cardinal direction.
+    static int nearest_border_production(GAME game, int x, int y, int dir, int my_id) {
+        int w = game.width, h = game.height;
+        int cx = x, cy = y;
+        int maxd = (w > h ? w : h);
+        for (int d = 1; d <= maxd; d++) {
+            cx = wrap_x(cx + dx_for_dir(dir), w);
+            cy = wrap_y(cy + dy_for_dir(dir), h);
+            int owner = game.owner[cx][cy];
+            if (owner != my_id) {
+                return game.production[cx][cy];
+            }
+        }
+        return -1; // no border found (unlikely)
+    }
+
+    static int choose_direction(GAME game, int x, int y) {
+        int my_id = game.playertag;
+        int my_strength = game.strength[x][y];
+        int my_prod = game.production[x][y];
+
+        // Threshold: wait until sufficiently strong (target 10x production)
+        if (my_strength < my_prod * 10) {
+            return STILL;
+        }
+        // Additional rule: on zero-production tiles, wait until some absolute strength
+        if (my_prod == 0 && my_strength < 20) {
+            return STILL;
+        }
+
+        // If adjacent non-owned tiles are weaker, attack the one with the highest production.
+        int best_dir = STILL;
+        int best_prod = -1;
+        int dirs[4] = {NORTH, EAST, SOUTH, WEST};
+        for (int i = 0; i < 4; i++) {
+            int dir = dirs[i];
+            SITE n = GetSiteFromMovement(game, x, y, dir);
+            if (n.owner != my_id && my_strength > n.strength) {
+                if (n.production > best_prod) {
+                    best_prod = n.production;
+                    best_dir = dir;
+                }
+            }
+        }
+        if (best_dir != STILL) return best_dir;
+
+        // Otherwise, move toward the direction whose nearest non-owned tile has the highest production.
+        int best_score = -1000000000;
+        best_dir = STILL;
+        for (int i = 0; i < 4; i++) {
+            int dir = dirs[i];
+            int prod_ray = nearest_border_production(game, x, y, dir, my_id);
+            if (prod_ray > best_score) {
+                best_score = prod_ray;
+                best_dir = dir;
+            }
+        }
+        if (best_dir == STILL) return STILL;
+           SITE n2 = GetSiteFromMovement(game, x, y, best_dir);
+            if (n2.owner != my_id && n2.strength >= my_strength) {
+                return STILL;
+            }
+        return best_dir;
+    }
+
+    int main(void) {
+        GAME game;
+        int x, y, direction;
+
+        // Deterministic behavior helpful for matching and debugging
+        srand(0);
+
+        game = GetInit();
+        SendInit(BOT_NAME);
+
+        while (1) {
+            GetFrame(game);
+
+            for (x = 0 ; x < game.width ; x++) {
+                for (y = 0 ; y < game.height ; y++) {
+                    if (game.owner[x][y] == game.playertag) {
+                        direction = choose_direction(game, x, y);
+                        SetMove(game, x, y, direction);
+                    }
+                }
+            }
+
+            SendFrame(game);
+        }
+
+        return 0;
+    }
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

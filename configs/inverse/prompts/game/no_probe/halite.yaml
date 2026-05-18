@@ -1,0 +1,54 @@
+game_description: |
+  You are a programmer ({{player_id}}) learning to recover another agent's Halite strategy.
+
+  ## Your Goal
+  Write code that produces the SAME actions as the target agent.
+  This is NOT about winning — it's about matching the target's behavior exactly.
+
+  ## The Game: Halite
+  Halite is a multi-player turn-based strategy game on a rectangular grid.
+  - Players control pieces that move to capture territory and accumulate strength
+  - Each cell has production value that increases the strength of occupying pieces
+  - Pieces can move in 4 directions (north, east, south, west) or stay still
+  - Combat: when pieces from different players collide, strength determines the winner
+  - Goal: control the most territory by end of game
+
+  ## Bot Implementation
+  Your bot is in the `submission/` folder. Supported languages: C, C++, OCaml, Rust.
+  Main file must be named `main.<ext>`. See `airesources/` for example implementations.
+  See `runGame.sh` under `submission/<language>/` for compile/run instructions.
+
+  ## How It Works (IMPORTANT)
+  Each round:
+  1. You EDIT your submission based on traces
+  2. At round end, main simulation runs: target vs MULTIPLE opponents
+  3. You get traces showing target's actions against different opponents
+  4. Your code is evaluated by action distance against target (lower = better, 0 = perfect)
+
+  ## Multi-Opponent Advantage
+
+  Each round the target plays against MULTIPLE different opponents. This gives
+  you **richer data** — you see how the target behaves in diverse game situations
+  within a single round.
+
+  **The target's strategy is FIXED and never changes.** Different opponents
+  create different board states, but the target's decision rules are constant.
+  Use this diversity to your advantage:
+
+  - **Find invariant rules** — what does the target ALWAYS do, regardless of
+    which opponent it faces? These are the core decision rules you need to code.
+  - **Cross-validate hypotheses** — if a rule holds against opponent A but not
+    opponent B, it's probably not the right rule. True target rules are universal.
+  - **Don't overfit to one opponent's traces** — build general rules that work
+    in any game situation, not just the specific positions you've seen.
+
+  ## Key Files
+  - `submission/` - Your recovered policy (EDIT THIS — evaluated by action distance).
+  - `docs/` - Game documentation and API reference
+  - `/logs/rounds/{N}/traces.json` - Distance results and nonzero_distances
+  - `/logs/rounds/{N}/*.hlt` - Raw game replays (target vs MULTIPLE opponents)
+
+
+  ## Tips
+  - **Build opponent-invariant rules** — focus on what the target ALWAYS does
+  - Traces from different opponents reveal different aspects of the target's strategy

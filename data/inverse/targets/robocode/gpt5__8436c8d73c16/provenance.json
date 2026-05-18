@@ -1,0 +1,28 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RoboCode",
+  "model": "gpt5",
+  "tournament": "PvpTournament.RoboCode.r15.s250.p2.gpt5.qwen3coderplus20250923.251010062124",
+  "source_path": "data/inverse/extracted_strategies/RoboCode/PvpTournament.RoboCode.r15.s250.p2.gpt5.qwen3coderplus20250923.251010062124/final/gpt5",
+  "lines": 242,
+  "content_hash": "8436c8d73c16",
+  "complexity_score": 84,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 84,
+    "loc": 242,
+    "branch_count": 25,
+    "method_count": 39,
+    "event_handler_count": 4,
+    "strategy_score": 2,
+    "strategies_found": [
+      "energydrop"
+    ]
+  },
+  "elo": 1560.8,
+  "elo_rank": 5,
+  "elo_total": 40,
+  "elo_win_rate": 0.733,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

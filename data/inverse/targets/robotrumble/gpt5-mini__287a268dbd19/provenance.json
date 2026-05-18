@@ -1,0 +1,26 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RobotRumble",
+  "model": "gpt5-mini",
+  "tournament": "PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-5-20250929.gpt-5-mini.251015010636",
+  "source_path": "data/inverse/extracted_strategies/RobotRumble/PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-5-20250929.gpt-5-mini.251015010636/final/gpt5-mini",
+  "lines": 65,
+  "content_hash": "287a268dbd19",
+  "complexity_score": 31.0,
+  "complexity_tier": "low",
+  "complexity_breakdown": {
+    "total": 31.0,
+    "loc": 65,
+    "branch_count": 9,
+    "loop_count": 3,
+    "func_count": 1,
+    "strategy_score": 0,
+    "strategies_found": []
+  },
+  "elo": 1404.8,
+  "elo_rank": 39,
+  "elo_total": 40,
+  "elo_win_rate": 0.0,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}

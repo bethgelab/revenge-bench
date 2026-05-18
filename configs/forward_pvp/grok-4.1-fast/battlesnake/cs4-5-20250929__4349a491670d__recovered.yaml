@@ -1,0 +1,188 @@
+# Forward PvP: cs4-5-20250929__4349a491670d — condition: recovered
+# Game: BattleSnake, OOD distance: 0.0423, best round: 4
+# Model: openai/grok-4.1-fast
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): grok-4.1-fast, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/cs4-5-20250929__4349a491670d
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/grok-4.1-fast
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    # Battlesnake learner policy tuned to match target behavior
+
+    import typing
+
+    def info() -> typing.Dict:
+        return {
+            "apiversion": "1",
+            "author": "learner",
+            "color": "#888888",
+            "head": "default",
+            "tail": "default",
+        }
+
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+    def end(game_state: typing.Dict):
+        print("GAME OVER")
+
+    def manhattan(a: typing.Tuple[int, int], b: typing.Tuple[int, int]) -> int:
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+    def move(game_state: typing.Dict) -> typing.Dict:
+        # Policy: choose any safe move that reduces distance to nearest food.
+        # Safety includes: avoid walls, neck, occupied cells, and potential head-to-head squares
+        # against equal/longer opponents. Allow stepping into our tail if it will vacate (and not on food).
+        # Tie-break among reducing moves: prefer vertical (up, then down) over horizontal (left, then right).
+        # If no reducing move exists, fallback preference among safe moves: down > up > left > right.
+        board = game_state["board"]
+        width = board["width"]
+        height = board["height"]
+        foods = [(f["x"], f["y"]) for f in board.get("food", [])]
+
+        you = game_state["you"]
+        body = you["body"]
+        head = (you["head"]["x"], you["head"]["y"])
+        neck = (body[1]["x"], body[1]["y"]) if len(body) >= 2 else None
+        my_body_coords = [(b["x"], b["y"]) for b in body]
+        my_tail = tuple(my_body_coords[-1]) if my_body_coords else None
+
+        # Occupied cells by all snakes
+        occupied = set()
+        for s in board.get("snakes", []):
+            for seg in s.get("body", []):
+                occupied.add((seg["x"], seg["y"]))
+
+        # Allow moving into our own tail if it will vacate (heuristic): allow tail square if it's our tail and not a food square
+        food_set = set(foods)
+        if my_tail is not None and my_tail in occupied and my_tail not in food_set:
+            occupied.remove(my_tail)
+
+        # Compute potential head-to-head danger squares from equal/longer opponents
+        danger = set()
+        for s in board.get("snakes", []):
+            # Skip ourselves
+            if s.get("id") == you.get("id"):
+                continue
+            # Only consider opponents with length >= ours
+            try:
+                opp_len = int(s.get("length", 0))
+                my_len = int(you.get("length", 0))
+            except Exception:
+                opp_len = s.get("length", 0)
+                my_len = you.get("length", 0)
+            if opp_len >= my_len:
+                hx, hy = s["head"]["x"], s["head"]["y"]
+                for dx, dy in [(0,1), (0,-1), (1,0), (-1,0)]:
+                    px, py = hx + dx, hy + dy
+                    if 0 <= px < width and 0 <= py < height:
+                        danger.add((px, py))
+
+        # Possible moves
+        moves = {
+            "up": (head[0], head[1] + 1),
+            "down": (head[0], head[1] - 1),
+            "left": (head[0] - 1, head[1]),
+            "right": (head[0] + 1, head[1]),
+        }
+
+        def in_bounds(p: typing.Tuple[int, int]) -> bool:
+            return 0 <= p[0] < width and 0 <= p[1] < height
+
+        # Safety: avoid neck, walls, occupied cells, and head-to-head danger squares
+        safe_moves: typing.List[str] = []
+        for m, p in moves.items():
+            if neck and p == neck:
+                continue
+            if not in_bounds(p):
+                continue
+            if p in occupied:
+                continue
+            if p in danger:
+                continue
+            safe_moves.append(m)
+
+        # If no safe moves, default to down (arbitrary)
+        if not safe_moves:
+            print(f"MOVE {game_state.get('turn','?')}: down (no safe moves)")
+            return {"move": "down"}
+
+        # Determine nearest food deterministically
+        target_food = None
+        if foods:
+            # Sort for deterministic tie-breaking, then take min by manhattan
+            foods_sorted = sorted(foods, key=lambda f: (f[0], f[1]))
+            target_food = min(foods_sorted, key=lambda f: manhattan(head, f))
+
+        # Collect reducing moves among safe ones
+        reducing_moves: typing.List[str] = []
+        if target_food:
+            base_d = manhattan(head, target_food)
+            for m in safe_moves:
+                if manhattan(moves[m], target_food) < base_d:
+                    reducing_moves.append(m)
+
+        # Prefer any reducing move; tie-break vertical over horizontal: up, down, left, right
+        if reducing_moves:
+            for pref in ["up", "down", "left", "right"]:
+                if pref in reducing_moves:
+                    print(f"MOVE {game_state.get('turn','?')}: {pref} (reducing toward food {target_food})")
+                    return {"move": pref}
+
+        # No reducing move exists; fallback among safe moves with bias down > up > left > right
+        for pref in ["down", "up", "left", "right"]:
+            if pref in safe_moves:
+                print(f"MOVE {game_state.get('turn','?')}: {pref} (fallback among safe)")
+                return {"move": pref}
+
+        # Should not reach here, default to down
+        print(f"MOVE {game_state.get('turn','?')}: down (final default)")
+        return {"move": "down"}
+
+    # Start server when `python main.py` is run
+    if __name__ == "__main__":
+        from server import run_server
+        run_server({"info": info, "start": start, "move": move, "end": end})
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

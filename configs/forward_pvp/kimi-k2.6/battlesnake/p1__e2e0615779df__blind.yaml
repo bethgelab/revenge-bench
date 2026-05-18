@@ -1,0 +1,42 @@
+# Forward PvP: p1__e2e0615779df -- condition: blind
+# Game: BattleSnake, OOD distance: 0.0167, best round: 5
+# Model: openai/kimi-k2.6
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): kimi-k2.6, blind condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/p1__e2e0615779df
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/kimi-k2.6
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).

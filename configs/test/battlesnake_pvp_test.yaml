@@ -1,0 +1,22 @@
+game:
+  name: BattleSnake
+  sims_per_round: 1
+  args:
+    width: 11
+    height: 11
+    browser: false
+tournament:
+  rounds: 1
+players:
+- agent: mini
+  name: p1
+  config:
+    agent: !include mini/default.yaml
+    model:  !include mini/instant_submit.yaml
+- agent: mini
+  name: p2
+  config:
+    agent: !include mini/default.yaml
+    model:  !include mini/instant_submit.yaml
+prompts:
+  game_description: "asdf"

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record>
+<!-- Round 0: 4 turns, target fires on turn 2 -->
+<turn round="0" turn="0" ver="1">
+    <robots>
+        <robot id="0" vsName="MyTank*" state="ACTIVE"
+               energy="100.0" x="100.0" y="200.0"
+               bodyHeading="0.0" gunHeading="0.0" radarHeading="0.0"
+               gunHeat="3.0" velocity="0.0"
+               teamName="target.MyTank*" name="target.MyTank*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+        <robot id="1" vsName="EnemyBot*" state="ACTIVE"
+               energy="100.0" x="600.0" y="400.0"
+               bodyHeading="3.14159" gunHeading="3.14159" radarHeading="3.14159"
+               gunHeat="3.0" velocity="0.0"
+               teamName="opponent.EnemyBot*" name="opponent.EnemyBot*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+    </robots>
+    <bullets/>
+</turn>
+<turn round="0" turn="1" ver="1">
+    <robots>
+        <robot id="0" vsName="MyTank*" state="ACTIVE"
+               energy="100.0" x="105.0" y="200.0"
+               bodyHeading="0.174533" gunHeading="0.349066" radarHeading="0.785398"
+               gunHeat="2.8" velocity="5.0"
+               teamName="target.MyTank*" name="target.MyTank*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+        <robot id="1" vsName="EnemyBot*" state="ACTIVE"
+               energy="100.0" x="595.0" y="400.0"
+               bodyHeading="3.31613" gunHeading="3.31613" radarHeading="3.31613"
+               gunHeat="2.8" velocity="-5.0"
+               teamName="opponent.EnemyBot*" name="opponent.EnemyBot*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+    </robots>
+    <bullets/>
+</turn>
+<turn round="0" turn="2" ver="1">
+    <robots>
+        <robot id="0" vsName="MyTank*" state="ACTIVE"
+               energy="98.0" x="112.0" y="200.0"
+               bodyHeading="0.349066" gunHeading="0.698132" radarHeading="1.5708"
+               gunHeat="1.6" velocity="7.0"
+               teamName="target.MyTank*" name="target.MyTank*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+        <robot id="1" vsName="EnemyBot*" state="ACTIVE"
+               energy="100.0" x="588.0" y="400.0"
+               bodyHeading="3.49066" gunHeading="3.49066" radarHeading="3.49066"
+               gunHeat="2.6" velocity="-7.0"
+               teamName="opponent.EnemyBot*" name="opponent.EnemyBot*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+    </robots>
+    <bullets>
+        <bullet id="b0" owner="0" state="FIRED"
+                x="112.0" y="200.0" heading="0.698132" power="2.0"/>
+    </bullets>
+</turn>
+<turn round="0" turn="3" ver="1">
+    <robots>
+        <robot id="0" vsName="MyTank*" state="ACTIVE"
+               energy="98.0" x="120.0" y="200.0"
+               bodyHeading="0.523599" gunHeading="1.047198" radarHeading="2.356194"
+               gunHeat="1.4" velocity="8.0"
+               teamName="target.MyTank*" name="target.MyTank*">
+            <score totalScore="10.0" currentScore="10.0"/>
+        </robot>
+        <robot id="1" vsName="EnemyBot*" state="ACTIVE"
+               energy="94.0" x="580.0" y="400.0"
+               bodyHeading="3.66519" gunHeading="3.66519" radarHeading="3.66519"
+               gunHeat="2.4" velocity="-8.0"
+               teamName="opponent.EnemyBot*" name="opponent.EnemyBot*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+    </robots>
+    <bullets/>
+</turn>
+<!-- Round 1: 2 turns (separate round, pairs should not cross round boundary) -->
+<turn round="1" turn="0" ver="1">
+    <robots>
+        <robot id="0" vsName="MyTank*" state="ACTIVE"
+               energy="100.0" x="200.0" y="300.0"
+               bodyHeading="1.5708" gunHeading="1.5708" radarHeading="1.5708"
+               gunHeat="3.0" velocity="0.0"
+               teamName="target.MyTank*" name="target.MyTank*">
+            <score totalScore="10.0" currentScore="0.0"/>
+        </robot>
+        <robot id="1" vsName="EnemyBot*" state="ACTIVE"
+               energy="100.0" x="500.0" y="300.0"
+               bodyHeading="4.71239" gunHeading="4.71239" radarHeading="4.71239"
+               gunHeat="3.0" velocity="0.0"
+               teamName="opponent.EnemyBot*" name="opponent.EnemyBot*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+    </robots>
+    <bullets/>
+</turn>
+<turn round="1" turn="1" ver="1">
+    <robots>
+        <robot id="0" vsName="MyTank*" state="ACTIVE"
+               energy="100.0" x="200.0" y="304.0"
+               bodyHeading="1.5708" gunHeading="1.5708" radarHeading="1.5708"
+               gunHeat="2.8" velocity="4.0"
+               teamName="target.MyTank*" name="target.MyTank*">
+            <score totalScore="10.0" currentScore="0.0"/>
+        </robot>
+        <robot id="1" vsName="EnemyBot*" state="ACTIVE"
+               energy="88.0" x="497.0" y="300.0"
+               bodyHeading="4.71239" gunHeading="4.71239" radarHeading="4.71239"
+               gunHeat="2.8" velocity="-3.0"
+               teamName="opponent.EnemyBot*" name="opponent.EnemyBot*">
+            <score totalScore="0.0" currentScore="0.0"/>
+        </robot>
+    </robots>
+    <bullets/>
+</turn>
+</record>

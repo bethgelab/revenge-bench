@@ -1,0 +1,244 @@
+# Forward PvP: p1__e2e0615779df — condition: oracle
+# Game: BattleSnake, OOD distance: 0.0167, best round: 5
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): GPT-5, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/p1__e2e0615779df
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-5
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    # Welcome to
+    # __________         __    __  .__                               __
+    # \______   \_____ _/  |__/  |_|  |   ____   ______ ____ _____  |  | __ ____
+    #  |    |  _/\__  \\   __\   __\  | _/ __ \ /  ___//    \\__  \ |  |/ // __ \
+    #  |    |   \ / __ \|  |  |  | |  |_\  ___/ \___ \|   |  \/ __ \|    <\  ___/
+    #  |________/(______/__|  |__| |____/\_____>______>___|__(______/__|__\\_____>
+    #
+    # This file can be a nice home for your Battlesnake logic and helper functions.
+    #
+    # To get you started we've included code to prevent your Battlesnake from moving backwards.
+    # For more info see docs.battlesnake.com
+
+    import random
+    import typing
+    from collections import deque
+
+
+    def get_area(board, start_x, start_y, occupied, board_width, board_height):
+        """Calculate the area reachable from a position using BFS."""
+        visited = set(occupied)
+        visited.add((start_x, start_y))
+        queue = deque([(start_x, start_y)])
+        area = 1
+        while queue:
+            x, y = queue.popleft()
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < board_width and 0 <= ny < board_height and (nx, ny) not in visited:
+                    visited.add((nx, ny))
+                    queue.append((nx, ny))
+                    area += 1
+        return area
+
+
+    # info is called when you create your Battlesnake on play.battlesnake.com
+    # and controls your Battlesnake's appearance
+    # TIP: If you open your Battlesnake URL in a browser you should see this data
+    def info() -> typing.Dict:
+        print("INFO")
+
+        return {
+            "apiversion": "1",
+            "author": "",  # TODO: Your Battlesnake Username
+            "color": "#888888",  # TODO: Choose color
+            "head": "default",  # TODO: Choose head
+            "tail": "default",  # TODO: Choose tail
+        }
+
+
+    # start is called when your Battlesnake begins a game
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+
+    # end is called when your Battlesnake finishes a game
+    def end(game_state: typing.Dict):
+        print("GAME OVER\n")
+
+
+    # move is called on every turn and returns your next move
+    # Valid moves are "up", "down", "left", or "right"
+    # See https://docs.battlesnake.com/api/example-move for available data
+    def move(game_state: typing.Dict) -> typing.Dict:
+
+        is_move_safe = {"up": True, "down": True, "left": True, "right": True}
+
+        # We've included code to prevent your Battlesnake from moving backwards
+        my_head = game_state["you"]["body"][0]  # Coordinates of your head
+        my_neck = game_state["you"]["body"][1]  # Coordinates of your "neck"
+
+        if my_neck["x"] < my_head["x"]:  # Neck is left of head, don't move left
+            is_move_safe["left"] = False
+
+        elif my_neck["x"] > my_head["x"]:  # Neck is right of head, don't move right
+            is_move_safe["right"] = False
+
+        elif my_neck["y"] < my_head["y"]:  # Neck is below head, don't move down
+            is_move_safe["down"] = False
+
+        elif my_neck["y"] > my_head["y"]:  # Neck is above head, don't move up
+            is_move_safe["up"] = False
+
+        # Prevent your Battlesnake from moving out of bounds
+        board_width = game_state['board']['width']
+        board_height = game_state['board']['height']
+
+        # Prevent collisions with self and other snakes
+        occupied = set()
+        for snake in game_state["board"]["snakes"]:
+            for segment in snake["body"]:
+                occupied.add((segment["x"], segment["y"]))
+
+        directions = {
+            "up": (0, 1),
+            "down": (0, -1),
+            "left": (-1, 0),
+            "right": (1, 0)
+        }
+
+        for move in is_move_safe:
+            if is_move_safe[move]:
+                dx, dy = directions[move]
+                next_x = my_head["x"] + dx
+                next_y = my_head["y"] + dy
+                if not (0 <= next_x < board_width and 0 <= next_y < board_height):
+                    is_move_safe[move] = False
+                elif (next_x, next_y) in occupied:
+                    is_move_safe[move] = False
+
+        # Get initial safe moves
+        safe_moves = [move for move, isSafe in is_move_safe.items() if isSafe]
+
+        # Avoid hazards if possible
+        hazards = set()
+        for h in game_state["board"]["hazards"]:
+            hazards.add((h["x"], h["y"]))
+        safe_non_hazard = []
+        for move in safe_moves:
+            dx, dy = directions[move]
+            next_x = my_head["x"] + dx
+            next_y = my_head["y"] + dy
+            if (next_x, next_y) not in hazards:
+                safe_non_hazard.append(move)
+        if safe_non_hazard:
+            safe_moves = safe_non_hazard
+
+        # Avoid head-to-head collisions where we lose or tie
+        my_length = len(game_state["you"]["body"])
+        opponent_heads = []
+        for snake in game_state["board"]["snakes"]:
+            if snake["id"] != game_state["you"]["id"]:
+                opponent_heads.append((snake["head"]["x"], snake["head"]["y"], len(snake["body"])))
+        bad_moves = []
+        for move in safe_moves:
+            dx, dy = directions[move]
+            next_x = my_head["x"] + dx
+            next_y = my_head["y"] + dy
+            for ox, oy, ol in opponent_heads:
+                if next_x == ox and next_y == oy:
+                    if my_length <= ol:
+                        bad_moves.append(move)
+                        break
+        safe_moves = [move for move in safe_moves if move not in bad_moves]
+
+        if len(safe_moves) == 0:
+            print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
+            return {"move": "down"}
+
+        # Evaluate moves based on area and food
+        food = game_state['board']['food']
+        best_move = None
+        best_score = -1
+        for move in safe_moves:
+            dx, dy = directions[move]
+            next_x = my_head["x"] + dx
+            next_y = my_head["y"] + dy
+            # Calculate area after move
+            occupied_after = occupied.copy()
+            # Remove tail (assuming it moves)
+            my_body = game_state["you"]["body"]
+            if len(my_body) > 1:
+                tail = my_body[-1]
+                occupied_after.discard((tail["x"], tail["y"]))
+            # But for simplicity, just use current occupied minus our body except head? Wait, complex.
+            # For area, use occupied as is, since after move head is at next, but occupied includes our body.
+            # To approximate, calculate area from next position, with occupied as current minus our tail.
+            occupied_for_area = occupied.copy()
+            if len(my_body) > 1:
+                tail = my_body[-1]
+                occupied_for_area.discard((tail["x"], tail["y"]))
+            area = get_area(game_state['board'], next_x, next_y, occupied_for_area, board_width, board_height)
+            # Food distance
+            food_dist = float('inf')
+            if food:
+                for f in food:
+                    dist = abs(next_x - f["x"]) + abs(next_y - f["y"])
+                    if dist < food_dist:
+                        food_dist = dist
+            # Score: prioritize area, then food
+            score = area * 1000 - food_dist
+            if score > best_score:
+                best_score = score
+                best_move = move
+
+        next_move = best_move if best_move else random.choice(safe_moves)
+        print(f"MOVE {game_state['turn']}: {next_move}")
+        return {"move": next_move}
+
+
+    # Start server when `python main.py` is run
+    if __name__ == "__main__":
+        from server import run_server
+
+        run_server({"info": info, "start": start, "move": move, "end": end})
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

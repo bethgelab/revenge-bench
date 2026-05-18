@@ -1,0 +1,174 @@
+# Forward PvP: cs4-20250514__f80300d975bf -- condition: recovered
+# Game: BattleSnake, OOD distance: 0.0854, best round: 1
+# Model: openai/deepseek-v3.2
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): deepseek-v3.2, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/cs4-20250514__f80300d975bf
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/deepseek-v3.2
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    # BattleSnake learner policy aiming to match target behavior
+    import typing
+
+    def info() -> typing.Dict:
+        return {
+            "apiversion": "1",
+            "author": "learner",
+            "color": "#888888",
+            "head": "default",
+            "tail": "default",
+        }
+
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+    def end(game_state: typing.Dict):
+        print("GAME OVER\n")
+
+    def _action_to_delta(a: str):
+        return {'up': (0,1), 'down': (0,-1), 'left': (-1,0), 'right': (1,0)}.get(a, (0,0))
+
+    def _nearest_food(head: dict, foods: list):
+        if not foods:
+            return None, None
+        d, f = min(((abs(f['x']-head['x']) + abs(f['y']-head['y']), f) for f in foods), key=lambda x: x[0])
+        return f, d
+
+    def _is_unsafe(nx: int, ny: int, width: int, height: int, my_body: list, snakes: list, my_id: str) -> bool:
+        # Walls
+        if nx < 0 or ny < 0 or nx >= width or ny >= height:
+            return True
+        # Own body (exclude tail as it may vacate)
+        own_blocks = {(p["x"], p["y"]) for p in my_body[:-1]} if my_body else set()
+        if (nx, ny) in own_blocks:
+            return True
+        # Other snakes (exclude their tails)
+        opp_blocks = set()
+        for s in snakes:
+            if s.get("id") != my_id:
+                b = s.get("body") or []
+                if b:
+                    opp_blocks |= {(p["x"], p["y"]) for p in b[:-1]}
+        if (nx, ny) in opp_blocks:
+            return True
+        return False
+
+    def move(game_state: typing.Dict) -> typing.Dict:
+        board = game_state["board"]
+        width = board["width"]
+        height = board["height"]
+        snakes = board["snakes"]
+        foods = board.get("food", [])
+        you = game_state["you"]
+        my_id = you["id"]
+        my_head = you["head"]
+        my_body = you["body"]
+        neck = my_body[1] if len(my_body) > 1 else None
+
+        # Candidate moves and deltas
+        candidates = [
+            ("up",    (0, 1)),
+            ("down",  (0,-1)),
+            ("left",  (-1, 0)),
+            ("right", (1, 0)),
+        ]
+
+        # Filter out moves that go back into neck or are immediately unsafe
+        safe_moves = []
+        for name, (dx, dy) in candidates:
+            nx, ny = my_head["x"] + dx, my_head["y"] + dy
+            if neck and nx == neck["x"] and ny == neck["y"]:
+                continue
+            if not _is_unsafe(nx, ny, width, height, my_body, snakes, my_id):
+                safe_moves.append((name, (dx, dy), (nx, ny)))
+
+        # If nothing is safe, default to 'down' to match default fallback
+        if not safe_moves:
+            return {"move": "down"}
+
+        # If food exists, try to minimize Manhattan distance to the nearest food
+        target_food, base_dist = _nearest_food(my_head, foods)
+        if target_food is not None:
+            # Compute distance after each safe move
+            scored = []
+            for name, (dx, dy), (nx, ny) in safe_moves:
+                after = abs(target_food["x"] - nx) + abs(target_food["y"] - ny)
+                reduced = after < base_dist
+                scored.append((after, reduced, name, (dx, dy), (nx, ny)))
+            # Choose moves with minimal 'after'
+            min_after = min(s[0] for s in scored)
+            best = [s for s in scored if s[0] == min_after]
+            # Prefer moves that reduce distance
+            reducers = [s for s in best if s[1]]
+            if reducers:
+                best = reducers
+            # Tie-break: prefer vertical (y-axis) over horizontal (x-axis)
+            vertical = [s for s in best if s[3][0] == 0 and s[3][1] != 0]
+            horizontal = [s for s in best if s[3][0] != 0 and s[3][1] == 0]
+            if vertical:
+                # Among vertical, only one reduces toward food (up or down). Choose the one present.
+                choice = sorted(vertical, key=lambda s: ["up","down","left","right"].index(s[2]))[0]
+                return {"move": choice[2]}
+            if horizontal:
+                choice = sorted(horizontal, key=lambda s: ["up","down","left","right"].index(s[2]))[0]
+                return {"move": choice[2]}
+            # Otherwise pick the first safe best
+            return {"move": best[0][2]}
+
+        # No food: prefer vertical moves first, then left, then right
+        # Build priority order
+        priority = ["up", "left", "down", "right"]
+        for p in priority:
+            for name, _, _ in safe_moves:
+                if name == p:
+                    return {"move": name}
+
+        # Fallback
+        return {"move": safe_moves[0][0]}
+
+    if __name__ == "__main__":
+        from server import run_server
+        run_server({"info": info, "start": start, "move": move, "end": end})
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

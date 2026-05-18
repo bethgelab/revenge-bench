@@ -1,0 +1,1 @@
+"""Tests for tournaments module."""

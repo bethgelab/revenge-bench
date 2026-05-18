@@ -1,0 +1,346 @@
+# Forward PvP: cs4-5-20250929__4349a491670d — condition: oracle
+# Game: BattleSnake, OOD distance: 0.0423, best round: 4
+# Model: openai/grok-4.1-fast
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): grok-4.1-fast, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/cs4-5-20250929__4349a491670d
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/grok-4.1-fast
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    # Welcome to
+    # __________         __    __  .__                               __
+    # \______   \_____ _/  |__/  |_|  |   ____   ______ ____ _____  |  | __ ____
+    #  |    |  _/\__  \\   __\   __\  | _/ __ \ /  ___//    \\__  \ |  |/ // __ \
+    #  |    |   \ / __ \|  |  |  | |  |_\  ___/ \___ \|   |  \/ __ \|    <\  ___/
+    #  |________/(______/__|  |__| |____/\_____>______>___|__(______/__|__\\_____>
+    #
+    # This file can be a nice home for your Battlesnake logic and helper functions.
+    #
+    # To get you started we've included code to prevent your Battlesnake from moving backwards.
+    # For more info see docs.battlesnake.com
+
+    import random
+    import typing
+    from collections import deque
+
+
+    # info is called when you create your Battlesnake on play.battlesnake.com
+    # and controls your Battlesnake's appearance
+    # TIP: If you open your Battlesnake URL in a browser you should see this data
+    def info() -> typing.Dict:
+        print("INFO")
+
+        return {
+            "apiversion": "1",
+            "author": "claude-sonnet-4-5-20250929",
+            "color": "#00FF00",  # Green color
+            "head": "default",
+            "tail": "default",
+        }
+
+
+    # start is called when your Battlesnake begins a game
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+
+    # end is called when your Battlesnake finishes a game
+    def end(game_state: typing.Dict):
+        print("GAME OVER\n")
+
+
+    def get_next_position(head: typing.Dict, move: str) -> typing.Dict:
+        """Calculate the next position given a head position and move direction"""
+        x, y = head["x"], head["y"]
+        if move == "up":
+            y += 1
+        elif move == "down":
+            y -= 1
+        elif move == "left":
+            x -= 1
+        elif move == "right":
+            x += 1
+        return {"x": x, "y": y}
+
+
+    def is_position_safe(pos: typing.Dict, game_state: typing.Dict) -> bool:
+        """Check if a position is safe to move to"""
+        board_width = game_state['board']['width']
+        board_height = game_state['board']['height']
+
+        # Check boundaries
+        if pos["x"] < 0 or pos["x"] >= board_width:
+            return False
+        if pos["y"] < 0 or pos["y"] >= board_height:
+            return False
+
+        # Check snake bodies (excluding tails which will move)
+        for snake in game_state['board']['snakes']:
+            for i, segment in enumerate(snake['body'][:-1]):  # Exclude tail
+                if segment["x"] == pos["x"] and segment["y"] == pos["y"]:
+                    return False
+
+        # Avoid head-to-head collisions with longer or equal snakes
+        my_length = game_state['you']['length']
+        for snake in game_state['board']['snakes']:
+            if snake['id'] == game_state['you']['id']:
+                continue
+
+            opponent_head = snake['head']
+            opponent_length = snake['length']
+
+            # Check if opponent could move to this position
+            for opp_move in ["up", "down", "left", "right"]:
+                opp_next = get_next_position(opponent_head, opp_move)
+                if opp_next["x"] == pos["x"] and opp_next["y"] == pos["y"]:
+                    # Avoid if opponent is longer or equal length
+                    if opponent_length >= my_length:
+                        return False
+
+        return True
+
+
+    def flood_fill(start_pos: typing.Dict, game_state: typing.Dict, max_depth: int = 100) -> int:
+        """
+        Simple flood fill to count reachable squares.
+        """
+        board_width = game_state['board']['width']
+        board_height = game_state['board']['height']
+
+        occupied = set()
+        for snake in game_state['board']['snakes']:
+            for segment in snake['body'][:-1]:  # Exclude tail
+                occupied.add((segment['x'], segment['y']))
+
+        # BFS to count reachable squares
+        visited = set()
+        queue = deque([(start_pos['x'], start_pos['y'], 0)])
+        visited.add((start_pos['x'], start_pos['y']))
+        count = 0
+
+        while queue and count < max_depth:
+            x, y, depth = queue.popleft()
+            count += 1
+
+            if depth >= max_depth:
+                continue
+
+            # Check all four directions
+            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                nx, ny = x + dx, y + dy
+
+                if (nx, ny) in visited:
+                    continue
+
+                if nx < 0 or nx >= board_width or ny < 0 or ny >= board_height:
+                    continue
+
+                if (nx, ny) in occupied:
+                    continue
+
+                visited.add((nx, ny))
+                queue.append((nx, ny, depth + 1))
+
+        return count
+
+
+    def manhattan_distance(pos1: typing.Dict, pos2: typing.Dict) -> int:
+        """Calculate Manhattan distance between two positions"""
+        return abs(pos1["x"] - pos2["x"]) + abs(pos1["y"] - pos2["y"])
+
+
+    def find_closest_food(head: typing.Dict, food: typing.List[typing.Dict]) -> typing.Dict:
+        """Find the closest food to our head"""
+        if not food:
+            return None
+
+        closest = min(food, key=lambda f: manhattan_distance(head, f))
+        return closest
+
+
+    # move is called on every turn and returns your next move
+    # Valid moves are "up", "down", "left", or "right"
+    # See https://docs.battlesnake.com/api/example-move for available data
+    def move(game_state: typing.Dict) -> typing.Dict:
+        """
+        Round 14 Strategy: ULTRA CONSERVATIVE
+
+        Performance History:
+        - Round 0 (baseline): 47.1% win rate
+        - Round 10 (80% threshold): 46.7% win rate - BEST recent
+        - Round 11 (65% threshold): 41.8% win rate - Too aggressive
+        - Round 13 (70-80% adaptive): 45.6% win rate - Still too aggressive
+
+        KEY INSIGHT: More conservative = better performance
+        - R10's 80% was close to baseline
+        - R13's 70-80% was worse
+        - R11's 65% was worst
+
+        New Strategy: ULTRA CONSERVATIVE (85% threshold)
+        - Use 85% space threshold (higher than R10's 80%)
+        - Require 65+ absolute space (higher than R13's 60)
+        - Only drop to 80% when health < 40 (not 50)
+        - Only drop to 75% when health < 25 (not 35)
+        - Critical space = max(length, 40) (higher than R13's 35)
+        - Late game: even more conservative (90% threshold after turn 100)
+
+        Philosophy: "Maximize survival, minimize risk"
+        """
+        my_head = game_state["you"]["body"][0]
+        my_neck = game_state["you"]["body"][1]
+        my_health = game_state['you']['health']
+        my_length = game_state['you']['length']
+        current_turn = game_state['turn']
+
+        is_move_safe = {"up": True, "down": True, "left": True, "right": True}
+
+        # Prevent moving backwards into neck
+        if my_neck["x"] < my_head["x"]:
+            is_move_safe["left"] = False
+        elif my_neck["x"] > my_head["x"]:
+            is_move_safe["right"] = False
+        elif my_neck["y"] < my_head["y"]:
+            is_move_safe["down"] = False
+        elif my_neck["y"] > my_head["y"]:
+            is_move_safe["up"] = False
+
+        # Check all moves for safety
+        for move_dir in ["up", "down", "left", "right"]:
+            if is_move_safe[move_dir]:
+                next_pos = get_next_position(my_head, move_dir)
+                if not is_position_safe(next_pos, game_state):
+                    is_move_safe[move_dir] = False
+
+        # Get safe moves
+        safe_moves = [move_dir for move_dir, isSafe in is_move_safe.items() if isSafe]
+
+        if len(safe_moves) == 0:
+            print(f"MOVE {game_state['turn']}: No safe moves! Moving down")
+            return {"move": "down"}
+
+        # Calculate space for each safe move
+        move_spaces = {}
+        for move_dir in safe_moves:
+            next_pos = get_next_position(my_head, move_dir)
+            space = flood_fill(next_pos, game_state)
+            move_spaces[move_dir] = space
+
+        # Find move towards food if available
+        food = game_state['board']['food']
+        food_move = None
+        food_distance = float('inf')
+
+        if food:
+            closest_food = find_closest_food(my_head, food)
+
+            if closest_food:
+                # Find the move that gets us closest to food
+                for move_dir in safe_moves:
+                    next_pos = get_next_position(my_head, move_dir)
+                    distance = manhattan_distance(next_pos, closest_food)
+                    if distance < food_distance:
+                        food_distance = distance
+                        food_move = move_dir
+
+        # Decision logic: ULTRA CONSERVATIVE threshold
+
+        if food_move:
+            food_space = move_spaces[food_move]
+            max_space = max(move_spaces.values())
+
+            # Critical space threshold: need at least this much space
+            critical_space = max(my_length, 40)  # Increased from 35
+
+            # Ultra conservative thresholds - only take risks when truly necessary
+            if my_health < 25:
+                # Very hungry - take calculated risks
+                space_threshold = 0.75  # 75%
+                min_absolute_space = 50
+            elif my_health < 40:
+                # Moderately hungry - still conservative
+                space_threshold = 0.80  # 80%
+                min_absolute_space = 60
+            else:
+                # Healthy - ultra conservative
+                space_threshold = 0.85  # 85% - HIGHER than R10's 80%
+                min_absolute_space = 65  # HIGHER than R13's 60
+
+            # Late game: be EXTREMELY conservative
+            if current_turn > 100:
+                space_threshold = min(space_threshold + 0.05, 0.90)  # Up to 90%!
+                min_absolute_space += 10
+
+            # Take food move if:
+            # 1. Health is critically low (< 20), OR
+            # 2. Food move has excellent absolute space, OR
+            # 3. Food move preserves high percentage of space relative to best move
+
+            if my_health < 20:
+                # Desperate for food
+                print(f"MOVE {current_turn}: {food_move} (CRITICAL food, health={my_health}, space={food_space})")
+                return {"move": food_move}
+            elif food_space >= min_absolute_space:
+                # Excellent absolute space - safe to take food
+                print(f"MOVE {current_turn}: {food_move} (food with excellent space={food_space}, health={my_health})")
+                return {"move": food_move}
+            elif food_space >= max_space * space_threshold and food_space >= critical_space:
+                # High space preservation
+                print(f"MOVE {current_turn}: {food_move} (food with {space_threshold*100:.0f}% space={food_space}/{max_space}, health={my_health})")
+                return {"move": food_move}
+            else:
+                # Food move would compromise space too much
+                print(f"MOVE {current_turn}: Food too risky (space={food_space} vs max={max_space}, threshold={space_threshold*100:.0f}%), choosing safe move")
+
+        # Choose move with most space
+        best_move = max(safe_moves, key=lambda m: move_spaces[m])
+        print(f"MOVE {current_turn}: {best_move} (best space={move_spaces[best_move]}, health={my_health})")
+        return {"move": best_move}
+
+
+    # Start server when `python main.py` is run
+    if __name__ == "__main__":
+        from server import run_server
+
+        run_server({"info": info, "start": start, "move": move, "end": end})
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

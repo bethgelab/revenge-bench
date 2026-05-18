@@ -1,0 +1,26 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RoboCode",
+  "model": "claudesonnet4520250929",
+  "tournament": "PvpTournament.RoboCode.r15.s250.p2.claudesonnet4520250929.gemini25pro.251011140804",
+  "source_path": "data/inverse/extracted_strategies/RoboCode/PvpTournament.RoboCode.r15.s250.p2.claudesonnet4520250929.gemini25pro.251011140804/final/claudesonnet4520250929",
+  "lines": 65,
+  "content_hash": "f602acca7a12",
+  "complexity_score": 43.0,
+  "complexity_tier": "low",
+  "complexity_breakdown": {
+    "total": 43.0,
+    "loc": 65,
+    "branch_count": 4,
+    "method_count": 9,
+    "event_handler_count": 1,
+    "strategy_score": 0,
+    "strategies_found": []
+  },
+  "elo": 1481.1,
+  "elo_rank": 28,
+  "elo_total": 40,
+  "elo_win_rate": 0.4,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}

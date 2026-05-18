@@ -1,0 +1,148 @@
+# Forward PvP: claudesonnet4520250929__52a747f942a5 -- condition: recovered
+# Game: RoboCode, OOD distance: 0.0477, best round: 3
+# Model: openai/kimi-k2.6
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): kimi-k2.6, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: RoboCode
+  sims_per_round: 30
+  record_ratio: 1.0
+  args:
+    nodisplay: true
+    nosound: true
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robocode/claudesonnet4520250929__52a747f942a5
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/kimi-k2.6
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RoboCode.
+    Robocode (Tank Royale) is a programming game where your code is the tank: each turn your bot sends intents -- speed plus body/gun/radar turn rates and firepower -- based on the game state it perceives via radar.
+    Your program decides how to move, aim, and fire in a deterministic, turn-based arena to outlast other bots.
+    Your bot logic must be written in Java and located in the `robots/custom/` directory.
+    Keep the main bot class named `MyTank.java`, but you can include additional Java files if you'd like.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your bot. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is in `robots/custom/`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    """Recovered strategy approximation for RoboCode target.
+
+    Key inferred rules from analyses and probes (round 3):
+    - Velocity: output equals current my_velocity (best match across traces).
+    - Body: turn_body = 0.0 most of the time (best fit vs enemy-clamped turning).
+    - Gun: aim directly at enemy -- turn_gun = clamp(gun_offset, -20, 20).
+    - Radar:
+      * If enemy present: turn_radar = clamp(2 * radar_offset, -45, 45) for radar lock.
+      * If enemy data missing (enemy_distance==0 and enemy_energy==0): spin radar at +45.
+    - Firing: only when gun is cool and gun is tightly aligned; modest power by distance.
+
+    Important geometry: headings are degrees, clockwise from North. The recorded turn_gun and
+    turn_radar are TOTAL deltas and already include coupling from body/gun, so we compute offsets
+    from absolute bearings to the enemy.
+    """
+    import math
+
+
+    def _clamp(x, lo, hi):
+        return max(lo, min(hi, x))
+
+
+    def _normalize_angle(deg):
+        """Normalize angle to [-180, 180) degrees."""
+        return (deg + 180) % 360 - 180
+
+
+    def _abs_bearing_to_enemy(state):
+        """Compute absolute bearing (degrees, clockwise from North) from my pos to enemy."""
+        dx = state["enemy_x"] - state["my_x"]
+        dy = state["enemy_y"] - state["my_y"]
+        return math.degrees(math.atan2(dx, dy)) % 360
+
+
+    def move(state):
+        # Detect when enemy data is missing in trace (placeholders are zeros)
+        enemy_present = not (
+            state.get("enemy_distance", 0.0) == 0.0 and state.get("enemy_energy", 0.0) == 0.0
+        )
+
+        # Velocity: best match is to echo current speed
+        velocity = _clamp(state.get("my_velocity", 0.0), -8.0, 8.0)
+
+        # Default outputs
+        turn_body = 0.0
+        turn_gun = 0.0
+        turn_radar = 0.0
+        fire_power = 0.0
+
+        if not enemy_present:
+            # When no enemy data, target typically holds body/gun and spins radar at +45
+            turn_body = 0.0
+            turn_gun = 0.0
+            turn_radar = 45.0
+            fire_power = 0.0
+        else:
+            # Compute bearings and offsets
+            abs_bearing = _abs_bearing_to_enemy(state)
+            gun_offset = _normalize_angle(abs_bearing - state.get("my_gun_heading", 0.0))
+            radar_offset = _normalize_angle(abs_bearing - state.get("my_radar_heading", 0.0))
+
+            # Body: stays at 0 (observed strongest signal)
+            turn_body = 0.0
+
+            # Gun: aim directly at enemy with clamp
+            turn_gun = _clamp(gun_offset, -20.0, 20.0)
+
+            # Radar: 2x lock pattern
+            turn_radar = _clamp(2.0 * radar_offset, -45.0, 45.0)
+
+            # Fire: only when cool and tightly aligned to enemy
+            gun_heat = state.get("my_gun_heat", 1.0)
+            if gun_heat <= 0.0 and abs(gun_offset) <= 2.0:
+                # Modest power by distance
+                distance = state.get("enemy_distance", 1e9)
+                if distance < 200.0:
+                    fire_power = 2.0
+                elif distance < 350.0:
+                    fire_power = 1.5
+                else:
+                    fire_power = 1.0
+            else:
+                fire_power = 0.0
+
+        return {
+            "velocity": _clamp(velocity, -8.0, 8.0),
+            "turn_body": _clamp(turn_body, -10.0, 10.0),
+            "turn_gun": _clamp(turn_gun, -20.0, 20.0),
+            "turn_radar": _clamp(turn_radar, -45.0, 45.0),
+            "fire_power": _clamp(fire_power, 0.0, 3.0),
+        }
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

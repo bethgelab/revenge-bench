@@ -1,0 +1,216 @@
+# Forward PvP: qwen3coderplus20250923__9ebdba6c8641 — condition: oracle
+# Game: RoboCode, OOD distance: 0.0405, best round: 4
+# Model: openai/gpt-5-mini
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): gpt-5-mini, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: RoboCode
+  sims_per_round: 30
+  record_ratio: 1.0
+  args:
+    nodisplay: true
+    nosound: true
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robocode/qwen3coderplus20250923__9ebdba6c8641
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-5-mini
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RoboCode.
+    Robocode (Tank Royale) is a programming game where your code is the tank: each turn your bot sends intents — speed plus body/gun/radar turn rates and firepower — based on the game state it perceives via radar.
+    Your program decides how to move, aim, and fire in a deterministic, turn-based arena to outlast other bots.
+    Your bot logic must be written in Java and located in the `robots/custom/` directory.
+    Keep the main bot class named `MyTank.java`, but you can include additional Java files if you'd like.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your bot. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is in `robots/custom/`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```java
+    package custom;
+
+    import robocode.*;
+    import robocode.util.Utils;
+    import java.awt.*;
+
+    public class MyTank extends AdvancedRobot {
+        String targetName = null; // Name of the robot we're currently tracking
+        int targetUnseenCount = 0; // How long since we last saw our target
+
+        // Variables for predictive targeting
+        double targetVelocity;
+        double targetHeading;
+        double targetDistance;
+        double targetBearing;
+        double targetEnergy;
+
+        public void run() {
+            // Set colors
+            setBodyColor(new Color(50, 100, 200));
+            setGunColor(new Color(100, 150, 255));
+            setRadarColor(new Color(200, 100, 50));
+            setScanColor(Color.white);
+            setBulletColor(Color.red);
+
+            // Set adjustment behaviors
+            setAdjustGunForRobotTurn(true);
+            setAdjustRadarForRobotTurn(true);
+
+            // Initialize movement
+            setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
+
+            // Loop forever
+            while (true) {
+                // Move in a more unpredictable pattern
+                moveUnpredictably();
+
+                execute();
+            }
+        }
+
+        public void moveUnpredictably() {
+            // Implement a more sophisticated movement pattern
+            // If we're near a wall, move away from it
+            if (getX() < 100 || getX() > getBattleFieldWidth() - 100 || 
+                getY() < 100 || getY() > getBattleFieldHeight() - 100) {
+                // Near a wall, move toward center
+                double centerAngle = Utils.normalAbsoluteAngle(Math.atan2(
+                    getBattleFieldWidth()/2 - getX(), 
+                    getBattleFieldHeight()/2 - getY()));
+                double turn = Utils.normalRelativeAngle(centerAngle - getHeadingRadians());
+                setTurnRightRadians(turn);
+                setAhead(100);
+            } else {
+                // Not near a wall, implement a more random movement
+                setTurnRight(45 + (Math.random() * 90 - 45)); // Random turn between 0 and 90 degrees
+                setAhead(50 + (Math.random() * 100 - 50)); // Random movement between 0 and 100
+            }
+        }
+
+        public void onScannedRobot(ScannedRobotEvent e) {
+            // If we have a target and this isn't it, return
+            if (targetName != null && !e.getName().equals(targetName)) {
+                return;
+            }
+
+            // If this is the first time seeing this robot, track it
+            if (targetName == null) {
+                targetName = e.getName();
+            }
+
+            // Reset unseen count
+            targetUnseenCount = 0;
+
+            // Update target information for predictive targeting
+            targetBearing = e.getBearingRadians();
+            targetDistance = e.getDistance();
+            targetHeading = e.getHeadingRadians();
+            targetVelocity = e.getVelocity();
+            targetEnergy = e.getEnergy();
+
+            // Calculate enemy position
+            double absoluteBearing = getHeadingRadians() + targetBearing;
+            double enemyX = getX() + targetDistance * Math.sin(absoluteBearing);
+            double enemyY = getY() + targetDistance * Math.cos(absoluteBearing);
+
+            // Predict enemy position based on velocity and heading
+            double bulletPower = Math.min(3.0, Math.max(0.1, 400.0 / targetDistance));
+            double bulletSpeed = 20.0 - bulletPower * 3.0;
+            double timeToHit = targetDistance / bulletSpeed;
+
+            // Predict where the enemy will be when our bullet arrives
+            double predictedX = enemyX + Math.sin(targetHeading) * targetVelocity * timeToHit;
+            double predictedY = enemyY + Math.cos(targetHeading) * targetVelocity * timeToHit;
+
+            // Calculate the angle to the predicted position
+            double predictedBearing = Utils.normalAbsoluteAngle(Math.atan2(
+                predictedX - getX(), 
+                predictedY - getY()));
+
+            // Aim and fire at the predicted position
+            double gunTurn = Utils.normalRelativeAngle(predictedBearing - getGunHeadingRadians());
+            setTurnGunRightRadians(gunTurn);
+
+            // Adjust firepower based on distance and enemy energy change
+            double firepower = Math.min(3.0, Math.max(0.1, 400.0 / targetDistance));
+
+            // Fire with calculated power
+            setFire(firepower);
+
+            // If enemy is far away, move toward them
+            if (targetDistance > 200) {
+                double turn = Utils.normalRelativeAngle(absoluteBearing - getHeadingRadians());
+                setTurnRightRadians(turn);
+                setAhead(100);
+            } 
+            // If enemy is too close, move away
+            else if (targetDistance < 100) {
+                double turn = Utils.normalRelativeAngle(absoluteBearing - getHeadingRadians());
+                setTurnRightRadians(turn + Math.PI); // Turn around
+                setAhead(100);
+            }
+
+            // Move radar to keep tracking
+            setTurnRadarRightRadians(Utils.normalRelativeAngle(absoluteBearing - getRadarHeadingRadians()));
+        }
+
+        public void onHitByBullet(HitByBulletEvent e) {
+            // Change direction when hit
+            setTurnRight(90 + (Math.random() * 60 - 30)); // Add some randomness
+            setAhead(100);
+        }
+
+        public void onHitRobot(HitRobotEvent e) {
+            // If we hit another robot, fire with max power
+            double gunTurn = Utils.normalRelativeAngle((getHeadingRadians() + e.getBearingRadians()) - getGunHeadingRadians());
+            setTurnGunRightRadians(gunTurn);
+            setFire(3);
+
+            // Move away from the robot we hit
+            setTurnRight(e.getBearing() + 180);
+            setAhead(100);
+        }
+
+        public void onRobotDeath(RobotDeathEvent e) {
+            // If our target died, reset target
+            if (e.getName().equals(targetName)) {
+                targetName = null;
+            }
+        }
+
+        public void onWin() {
+            // Victory dance
+            for (int i = 0; i < 5; i++) {
+                setTurnRight(72);
+                setAhead(50);
+                execute();
+            }
+        }
+    }
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

@@ -1,0 +1,160 @@
+# Forward PvP: gpt5__c98b51a24f8c — condition: oracle
+# Game: Halite, OOD distance: 0.2914, best round: 1
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): GPT-5, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: Halite
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/halite/gpt5__c98b51a24f8c
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-5
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called Halite.
+    Halite is a multi-player turn-based strategy game where bots compete on a rectangular grid to capture territory and accumulate strength.
+    Players control pieces that can move across the map to conquer neutral and enemy territory, with each cell providing production that increases the strength of pieces occupying it.
+    The goal is to control the most territory by the end of the game through strategic expansion, consolidation of forces, and tactical combat decisions.
+
+    You have the choice of writing your Halite bot in one of four programming languages: C, C++, OCaml, or Rust.
+    Example implementations can be found under the `airesources/` folder.
+    Your submission should be stored in the `submission/` folder. This folder currently contains an example C bot, but feel free to use any of the supported languages.
+    Please make sure your main file is named `main.<ext>`, where `<ext>` is the appropriate file extension for your chosen programming language.
+    You may include additional files as needed, but please ensure:
+    1. The `submission/` folder contains only files relevant to your bot.
+    2. The `submission/` folder ONLY contains a single bot (no multiple bots in one submission).
+    3. Your bot can be compiled. See `runGame.sh` under the corresponding `submission/<language>/` folder to see how we will compile and run your bot.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your bot. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is in `submission/`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```c
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <time.h>
+
+    #include "hlt.h"
+
+    #define BOT_NAME "gpt5-C-r1"
+
+    // Return the best immediate attack direction if any, otherwise STILL.
+    // Prefers capturing higher-production targets and slightly prefers enemy-owned over neutral.
+    static int best_attack_direction(GAME game, int x, int y) {
+        SITE me = GetSiteFromXY(game, x, y);
+        int best_dir = STILL;
+        int best_score = -1000000;
+
+        for (int dir = NORTH; dir <= WEST; dir++) {
+            SITE t = GetSiteFromMovement(game, x, y, dir);
+            if (t.owner != game.playertag && me.strength > t.strength) {
+                int enemy_bonus = (t.owner != 0 && t.owner != game.playertag) ? 20 : 0;
+                int score = t.production * 10 - t.strength + enemy_bonus;
+                if (score > best_score) {
+                    best_score = score;
+                    best_dir = dir;
+                }
+            }
+        }
+        return best_dir;
+    }
+
+    // Find direction toward the nearest non-owned site scanning along the four cardinal directions.
+    static int direction_to_nearest_border(GAME game, int x, int y) {
+        int best_dir = STILL;
+        int best_dist = game.width + game.height + 5; // large sentinel
+
+        for (int dir = NORTH; dir <= WEST; dir++) {
+            int dist = 1;
+            while (dist < best_dist && dist <= (dir == NORTH || dir == SOUTH ? game.height : game.width)) {
+                int nx = x, ny = y;
+                if (dir == NORTH) ny = y - dist;
+                else if (dir == SOUTH) ny = y + dist;
+                else if (dir == EAST) nx = x + dist;
+                else if (dir == WEST) nx = x - dist;
+
+                SITE s = GetSiteFromXY(game, nx, ny);
+                if (s.owner != game.playertag) {
+                    best_dir = dir;
+                    best_dist = dist;
+                    break;
+                }
+                dist++;
+            }
+        }
+        return best_dir;
+    }
+
+    int main(void) {
+
+        GAME game;
+        int x, y, move;
+
+        srand(time(NULL));
+
+        game = GetInit();
+        SendInit(BOT_NAME);
+
+        while (1) {
+
+            GetFrame(game);
+
+            for (x = 0 ; x < game.width ; x++) {
+                for (y = 0 ; y < game.height ; y++) {
+                    if (game.owner[x][y] == game.playertag) {
+                        SITE me = GetSiteFromXY(game, x, y);
+
+                        // 1) Try to attack if favorable
+                        int dir = best_attack_direction(game, x, y);
+                        if (dir != STILL) {
+                            move = dir;
+                        } else {
+                            // 2) Build strength if still weak for its production
+                            int threshold = me.production * 5;
+                            if (me.strength < threshold) {
+                                move = STILL;
+                            } else {
+                                // 3) Move toward the nearest border (non-owned cell)
+                                int border_dir = direction_to_nearest_border(game, x, y);
+                                move = (border_dir != STILL) ? border_dir : STILL;
+                            }
+                        }
+
+                        SetMove(game, x, y, move);
+                    }
+                }
+            }
+
+            SendFrame(game);
+        }
+
+        return 0;
+    }
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

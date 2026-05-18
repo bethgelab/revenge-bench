@@ -1,0 +1,30 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RobotRumble",
+  "model": "gpt5",
+  "tournament": "PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-5-20250929.gpt-5.251015100113",
+  "source_path": "data/inverse/extracted_strategies/RobotRumble/PvpTournament.RobotRumble.r15.s250.p2.claude-sonnet-4-5-20250929.gpt-5.251015100113/final/gpt5",
+  "lines": 215,
+  "content_hash": "9a0636e75e4f",
+  "complexity_score": 90,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 90,
+    "loc": 215,
+    "branch_count": 24,
+    "loop_count": 9,
+    "func_count": 13,
+    "strategy_score": 5,
+    "strategies_found": [
+      "retreat",
+      "isolat",
+      "minby"
+    ]
+  },
+  "elo": 1524.9,
+  "elo_rank": 10,
+  "elo_total": 40,
+  "elo_win_rate": 0.533,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

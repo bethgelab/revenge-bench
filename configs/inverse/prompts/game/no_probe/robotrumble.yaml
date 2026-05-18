@@ -1,0 +1,109 @@
+game_description: |
+  You are a programmer ({{player_id}}) learning to recover another agent's RobotRumble strategy.
+
+  ## Your Goal
+  Write code that produces the SAME actions as the target agent.
+  This is NOT about winning — it's about matching the target's behavior exactly.
+
+  ## The Game: RobotRumble
+  RobotRumble is a turn-based robot battle game on a 19x19 grid.
+  - You control a team of robots (each is a "Soldier" unit with health points)
+  - Two teams: Blue and Red, each starting with multiple units
+  - Game lasts up to 100 turns
+  - Each turn, every unit executes your `robot(state, unit)` function independently
+
+  ### Actions
+  Each unit can perform one action per turn:
+  - `{type: "Move", direction: "North"|"South"|"East"|"West"}` — move 1 cell
+  - `{type: "Attack", direction: "North"|"South"|"East"|"West"}` — attack adjacent cell
+
+  ### State Object (passed to your function)
+  ```javascript
+  state = {
+    turn: 5,                    // current turn number (1-indexed)
+    teams: {
+      Blue: [                    // your team's units
+        {id: "u1", coords: [3, 4], health: 5, team: "Blue", type: "Soldier"},
+        ...
+      ],
+      Red: [                     // enemy team's units
+        {id: "u2", coords: [7, 8], health: 3, team: "Red", type: "Soldier"},
+        ...
+      ]
+    }
+  }
+  ```
+
+  ### Unit Object (passed to your function)
+  ```javascript
+  unit = {
+    id: "u1",
+    coords: [3, 4],             // [x, y] position
+    health: 5,                   // remaining health
+    team: "Blue",
+    type: "Soldier"
+  }
+  ```
+
+  ### Your Bot Function (robot.js)
+  ```javascript
+  function robot(state, unit) {
+      // state.turn - current turn number
+      // state.objsByTeam(Team.Blue) - your team's units as Obj instances
+      // state.objsByTeam(Team.Red) - enemy units as Obj instances
+      // unit.coords - this unit's Coords {x, y}
+      // unit.health - this unit's health
+
+      // Return an Action:
+      return Action.move(Direction.North)
+      // or
+      return Action.attack(Direction.East)
+  }
+  ```
+
+  Your submission file is `robot.js`. Write a JavaScript function `robot(state, unit)`
+  that returns an Action. The stdlib provides Action, Direction, Coords, State, Obj, Team classes.
+
+  ## How Evaluation Works (IMPORTANT)
+  - You do NOT play in the live game
+  - The target plays against an opponent to generate traces
+  - Your code is evaluated OFFLINE: for each state the target saw,
+    we ask "what would your code do?" and compare to target's action
+  - Distance = mean action distance between your code and target (lower is better, 0 = perfect)
+  - Action distance: 0.0 if actions match exactly, 1.0 if they differ (type or direction)
+
+  ## How It Works (IMPORTANT)
+  Each round:
+  1. You EDIT your submission based on traces
+  2. At round end, main simulation runs: target vs MULTIPLE opponents
+  3. You get traces showing target's actions against different opponents
+  4. Your code is evaluated by action distance against target (lower = better, 0 = perfect)
+
+  ## Multi-Opponent Advantage
+
+  Each round the target plays against MULTIPLE different opponents. This gives
+  you **richer data** — you see how the target behaves in diverse game situations
+  within a single round.
+
+  **The target's strategy is FIXED and never changes.** Different opponents
+  create different board states, but the target's decision rules are constant.
+  Use this diversity to your advantage:
+
+  - **Find invariant rules** — what does the target ALWAYS do, regardless of
+    which opponent it faces? These are the core decision rules you need to code.
+  - **Cross-validate hypotheses** — if a rule holds against opponent A but not
+    opponent B, it's probably not the right rule. True target rules are universal.
+  - **Don't overfit to one opponent's traces** — build general rules that work
+    in any game situation, not just the specific turns you've seen.
+
+  ## Key Files
+  - `robot.js` - Your recovered policy (EDIT THIS — evaluated by action distance).
+  - `docs/` - Game documentation and API reference
+  - `/logs/rounds/{N}/traces.json` - Distance results and nonzero_distances
+  - `/logs/rounds/{N}/sim_*.json` - Raw game logs (target vs MULTIPLE opponents)
+
+  ## Tips
+  - **Build opponent-invariant rules** — focus on what the target ALWAYS does
+  - Traces from different opponents reveal different aspects of the target's strategy
+  - RobotRumble is multi-unit: your function is called once PER UNIT per turn
+  - Common patterns: attack adjacent enemies, move toward nearest enemy, retreat when low health, move to center

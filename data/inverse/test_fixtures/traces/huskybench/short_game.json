@@ -1,0 +1,86 @@
+{
+  "gameId": "test-hand-fixture-001",
+  "playerNames": {"100": "target", "200": "opponent"},
+  "blinds": {"small": 5, "big": 10},
+  "finalBoard": ["Td", "Ts", "Kh", "Jc", "Jh"],
+  "playerHands": {
+    "100": ["Ah", "Ks"],
+    "200": ["7c", "2d"]
+  },
+  "playerMoney": {
+    "initialAmount": 10000,
+    "finalMoney": {"100": 10060, "200": 9940},
+    "gameScores": {"100": 60, "200": -60}
+  },
+  "rounds": {
+    "0": {
+      "pot": 50,
+      "bets": {"100": 25, "200": 25},
+      "actions": {"100": "RAISE", "200": "CALL"},
+      "action_sequence": [
+        {
+          "player": 100,
+          "action": "RAISE",
+          "amount": 25,
+          "timestamp": 1000000,
+          "pot_after_action": 25,
+          "total_pot_after_action": 25
+        },
+        {
+          "player": 200,
+          "action": "CALL",
+          "amount": 25,
+          "timestamp": 1000001,
+          "pot_after_action": 25,
+          "total_pot_after_action": 50
+        }
+      ]
+    },
+    "1": {
+      "pot": 50,
+      "bets": {"100": 0, "200": 0},
+      "actions": {"100": "CHECK", "200": "CHECK"},
+      "action_sequence": [
+        {
+          "player": 100,
+          "action": "CHECK",
+          "amount": 0,
+          "timestamp": 1000002,
+          "pot_after_action": 0,
+          "total_pot_after_action": 50
+        },
+        {
+          "player": 200,
+          "action": "CHECK",
+          "amount": 0,
+          "timestamp": 1000003,
+          "pot_after_action": 0,
+          "total_pot_after_action": 50
+        }
+      ]
+    },
+    "2": {
+      "pot": 50,
+      "bets": {"100": 30, "200": 0},
+      "actions": {"100": "RAISE", "200": "FOLD"},
+      "action_sequence": [
+        {
+          "player": 100,
+          "action": "RAISE",
+          "amount": 30,
+          "timestamp": 1000004,
+          "pot_after_action": 30,
+          "total_pot_after_action": 80
+        },
+        {
+          "player": 200,
+          "action": "FOLD",
+          "amount": 0,
+          "timestamp": 1000005,
+          "pot_after_action": 0,
+          "total_pot_after_action": 80
+        }
+      ]
+    }
+  }
+}

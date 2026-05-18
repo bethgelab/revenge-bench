@@ -1,0 +1,463 @@
+import inspect
+import os
+import random
+import subprocess
+import time
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any
+
+from minisweagent.environments.docker import DockerEnvironment
+from minisweagent.environments.singularity import SingularityEnvironment
+
+from revenge_bench.agents.player import Player
+from revenge_bench.constants import DIR_LOGS, DIR_WORK, GH_ORG, RESULT_TIE
+from revenge_bench.utils.aws import is_running_in_aws_batch, pull_game_container_aws_ecr
+from revenge_bench.utils.environment import ContainerEnvironment, assert_zero_exit_code, copy_between_containers, copy_from_container
+from revenge_bench.utils.log import get_logger
+
+
+def get_runtime() -> str:
+    """Get the container runtime from the CODECLASH_RUNTIME environment variable.
+    Defaults to 'docker' if not set.
+    """
+    return os.environ.get("CODECLASH_RUNTIME", "docker").lower()
+
+
+class PlayerStats:
+    def __init__(self, name: str):
+        self.name = name
+        self.invalid_reason: str = ""
+        self.score: float = 0.0
+        self.valid_submit = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "invalid_reason": self.invalid_reason,
+            "score": self.score,
+            "valid_submit": self.valid_submit,
+        }
+
+
+class RoundStats:
+    def __init__(self, round_num: int, agents: list[Player]):
+        self.winner = None
+        self.round_num = round_num
+        # Map of player to game metric (e.g. # of wins, assets accumulated)
+        self.scores: dict[str, float] = {a.name: 0.0 for a in agents}
+        self.player_stats: dict[str, PlayerStats] = {agent.name: PlayerStats(name=agent.name) for agent in agents}
+        self.details: list[str] = []
+
+    def __str__(self) -> str:
+        rv = [f"In round {self.round_num}, the winner is {self.winner}.", "\nSummary of player performance:"]
+        for player, stats in self.player_stats.items():
+            if stats.valid_submit:
+                rv.append(f"- {player}: submission compiled successfully, score={stats.score}")
+            else:
+                rv.append(f"- {player}: submission failed with error: {stats.invalid_reason}")
+        if self.details:
+            rv.extend(["Details:"] + [f"- {line}" for line in self.details])
+        return "\n".join(rv)
+
+    def to_dict(self) -> dict[str, Any]:
+        # Going through some pain to ensure that the scores dict is always complete
+        player_names = set(self.player_stats.keys()) | set(self.scores.keys())
+        return {
+            "round_num": self.round_num,
+            "winner": self.winner,
+            "details": self.details,
+            "scores": {name: self.scores.get(name, 0.0) for name in player_names},
+            "player_stats": {name: stats.to_dict() for name, stats in self.player_stats.items()},
+        }
+
+
+class CodeArena(ABC):
+    name: str
+    description: str
+    default_args: dict = {}
+    submission: str
+
+    def __init__(self, config: dict, *, tournament_id: str, local_output_dir: Path, keep_containers: bool = False):
+        """The CodeArena class is responsible for running games, i.e., taking a list of code
+        from different agents/players and running them against each other.
+        It also provides the environments for the game and agents to run in.
+
+        The central method is `run_round`, which takes a list of agents and returns the winner of the round.
+
+        At the end of the the tournament, run the `end` method to clean up the game and agents and write the metadata.
+
+        Args:
+            config: The overall config for the tournament.
+            tournament_id: The id of the tournament.
+            local_output_dir: The host/local directory to write logs to.
+            keep_containers: Do not remove containers after games/agent finish.
+        """
+        self.url_gh: str = f"git@github.com:{GH_ORG}/{self.name}.git"
+        self.artifacts: list[Path] = []
+        """Artifact objects that we might want to clean up after the game."""
+        self.config: dict = config
+        self._keep_containers: bool = keep_containers
+        self._metadata: dict = {
+            "name": self.name,
+            "config": self.config["game"],
+            "game_id": tournament_id,
+            "created_timestamp": int(time.time()),
+        }
+        self.log_env: Path = DIR_LOGS
+        self.log_local: Path = local_output_dir
+        self.logger = get_logger(self.name, log_path=self.log_local / "game.log", emoji="🏓")
+        self.environment: ContainerEnvironment = self.get_environment()
+        """The running container environment for executing the game"""
+
+    @property
+    def game_config(self) -> dict:
+        return self.config["game"]
+
+    @property
+    def game_id(self) -> str:
+        return self._metadata["game_id"]
+
+    @property
+    def _uses_codex_learner(self) -> bool:
+        """True when any player config is `agent: inverse_codex`.
+
+        Whole-stack rule (per locked-decisions table in the plan): if the
+        learner is Codex-backed, *every* container in the tournament —
+        learner, target, opponent — uses the Codex-enabled image variant
+        for that arena. Simpler than per-player image selection and
+        matches how arenas already share one image across players.
+        """
+        for player in self.config.get("players", []):
+            if player.get("agent") == "inverse_codex":
+                return True
+        return False
+
+    @property
+    def _image_variant_suffix(self) -> str:
+        """Suffix appended to image names / Dockerfile basenames.
+
+        Today: `-codex` when an inverse_codex learner is present, else
+        empty. Generalising to multiple suffixes is a future concern.
+        """
+        return "-codex" if self._uses_codex_learner else ""
+
+    @property
+    def image_name(self) -> str:
+        return f"revenge_bench/{self.name.lower()}{self._image_variant_suffix}"
+
+    @property
+    def sif_path(self) -> Path:
+        """Path to the Singularity .sif image file, located next to the arena definition."""
+        arena_file = Path(inspect.getfile(self.__class__))
+        suffix = self._image_variant_suffix
+        return arena_file.parent / f"{self.name.lower()}{suffix}.sif"
+
+    def build_image(self):
+        """
+        Build a container image for the game.
+
+        For Docker: builds from the Dockerfile in the codebase. If running in AWS,
+        pulls the image from the AWS Docker registry instead.
+        For Singularity: builds a .sif file from the .def file if it doesn't already exist.
+        """
+        if get_runtime() == "singularity":
+            self._build_singularity_image()
+        else:
+            self._build_docker_image()
+
+    def _build_singularity_image(self):
+        """Build a Singularity .sif image from the .def file."""
+        if self.sif_path.exists():
+            self.logger.debug(f"Singularity image {self.sif_path} already exists")
+            return
+
+        arena_file = Path(inspect.getfile(self.__class__))
+        def_path = arena_file.parent / f"{self.name}.def"
+        if not def_path.exists():
+            raise RuntimeError(f"Singularity definition file not found: {def_path}")
+
+        self.logger.info(f"Building Singularity image {self.sif_path} from {def_path}")
+        result = subprocess.run(
+            f"singularity build --fakeroot {self.sif_path} {def_path}",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            self.logger.info(f"Built Singularity image {self.sif_path}")
+        else:
+            self.logger.error(f"Failed to build Singularity image: {result.stderr}\n{result.stdout}")
+            raise RuntimeError(f"Failed to build Singularity image: {result.stderr}")
+
+    def _build_docker_image(self):
+        """Build a Docker image from the Dockerfile."""
+        if is_running_in_aws_batch():
+            pull_game_container_aws_ecr(game_name=self.name, image_name=self.image_name, logger=self.logger)
+
+        # Check if container exists using subprocess
+        self.logger.debug(f"Checking if container {self.image_name} exists")
+        result = subprocess.run(
+            f"docker images -q {self.image_name}",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        if result.stdout.strip():
+            self.logger.debug(f"Container {self.image_name} exists")
+            return
+
+        self.logger.info(
+            f"Building Docker image {self.image_name}. This may take 1-5 minutes and only work on Linux for some games."
+        )
+
+        # NOTE: Assuming Dockerfile is declared in same directory as the arena.
+        # For Codex-enabled tournaments we pick `<Game>.codex.Dockerfile`,
+        # which `FROM`s the base image and layers in codex CLI + helper.
+        # That means the base image must be built first; we recurse into
+        # a non-codex build of the same arena before kicking the codex
+        # build.
+        arena_file = Path(inspect.getfile(self.__class__))
+        folder_path = arena_file.parent
+        if self._uses_codex_learner:
+            self._ensure_base_image_built(folder_path)
+            dockerfile = f"{folder_path}/{self.name}.codex.Dockerfile"
+        else:
+            dockerfile = f"{folder_path}/{self.name}.Dockerfile"
+        result = subprocess.run(
+            f"docker build --no-cache -t {self.image_name} -f {dockerfile} .",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            self.logger.info(f"Built Docker image {self.image_name}")
+        else:
+            self.logger.error(f"Failed to build Docker image: {result.stderr}\n{result.stdout}{result.stderr}")
+            raise RuntimeError(f"Failed to build Docker image: {result.stderr}")
+
+    def _ensure_base_image_built(self, folder_path: Path) -> None:
+        """Build the non-codex base image if the codex variant `FROM`s it.
+
+        Codex-enabled Dockerfiles start with `FROM revenge_bench/<arena>`, so
+        the base image must exist before we kick the codex build.
+        """
+        base_image = f"revenge_bench/{self.name.lower()}"
+        result = subprocess.run(
+            f"docker images -q {base_image}",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        if result.stdout.strip():
+            self.logger.debug(f"Base image {base_image} already exists")
+            return
+        self.logger.info(
+            f"Building base image {base_image} (required by codex variant)..."
+        )
+        result = subprocess.run(
+            f"docker build --no-cache -t {base_image} -f {folder_path}/{self.name}.Dockerfile .",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            self.logger.error(
+                f"Failed to build base image: {result.stderr}\n{result.stdout}"
+            )
+            raise RuntimeError(f"Failed to build base image: {result.stderr}")
+        self.logger.info(f"Built base image {base_image}")
+
+    def copy_logs_from_env(self, round_num: int) -> None:
+        """Copy logs from the game's environment to the local machine."""
+        (self.log_local / "rounds" / str(round_num)).mkdir(parents=True, exist_ok=True)
+        copy_from_container(
+            container=self.environment,
+            src_path=str(self.log_env) + "/.",
+            dest_path=self.log_round(round_num),
+        )
+
+        # Remove logs from container to save space
+        assert_zero_exit_code(
+            self.environment.execute(f"rm -rf {self.log_env}"),
+            logger=self.logger,
+        )
+
+    def end(self, cleanup: bool = False):
+        if cleanup:
+            for artifact in self.artifacts:
+                if artifact.exists():
+                    subprocess.run(f"rm -rf {artifact}", shell=True)
+            self.logger.info(f"🧼 Cleaned up {self.name} game")
+
+    def log_round(self, round_num: int) -> Path:
+        return self.log_local / "rounds" / str(round_num)
+
+    def get_environment(self, branch_name: str | None = None) -> ContainerEnvironment:
+        """Get a container environment with the game code installed."""
+        self.build_image()
+
+        env_vars = {
+            "GITHUB_TOKEN": os.getenv("GITHUB_TOKEN", ""),
+            "PAGER": "cat",
+            "MANPAGER": "cat",
+            "LESS": "-R",
+            "PIP_PROGRESS_BAR": "off",
+            "TQDM_DISABLE": "1",
+        }
+
+        # `timeout` here is the per-shell-command (subprocess.run) timeout
+        # for env.execute() calls — i.e. the bound on a single LLM-issued
+        # tool call. All long-running game-runner calls already pass an
+        # explicit `timeout=` kwarg (chess 300s, gradle 120s, huskybench
+        # ~200s, etc.) and are unaffected. 600s gives 2x headroom over the
+        # longest explicit timeout in the codebase. Lower than this risks
+        # timing out legit compiles; higher risks runaway LLM commands
+        # (e.g. `grep -rn /` in /proc/kcore) jamming SLURM tasks for hours.
+        # `container_timeout` (Docker only) is the container LIFETIME and
+        # is independent — kept at 10h for long-running tournaments.
+
+        if get_runtime() == "singularity":
+            environment = SingularityEnvironment(
+                image=str(self.sif_path),
+                cwd=str(DIR_WORK),
+                env=env_vars,
+                timeout=600,  # per-shell-command (10 min); see comment above
+                logger=self.logger,
+            )
+        else:
+            if not self._keep_containers:
+                run_args = ["--rm"]
+            else:
+                run_args = []
+            environment = DockerEnvironment(
+                image=self.image_name,
+                cwd=str(DIR_WORK),
+                env=env_vars,
+                timeout=600,  # per-shell-command (10 min); independent of container_timeout
+                container_timeout="10h",
+                logger=self.logger,
+                run_args=run_args,
+            )
+
+        branch_name = self.game_id if branch_name is None else branch_name
+
+        # Logger setting will likely not take effect for initial container creation logs
+        environment.logger = get_logger("environment", emoji="🪴")
+        # Use local (not --global) git config so it persists in the repo's .git/config.
+        # Singularity's --contain flag creates an ephemeral home per exec call,
+        # so --global config written to ~/.gitconfig is lost between calls.
+        for cmd in [
+            f"git branch {branch_name}",
+            f"git checkout {branch_name}",
+            'git config user.email "player@revenge_bench.com"',
+            'git config user.name "Player"',
+            "git config commit.gpgsign false",
+        ]:
+            assert_zero_exit_code(environment.execute(cmd), logger=self.logger)
+        return environment
+
+    def get_metadata(self) -> dict:
+        """This is what we write to metadata.json.
+        You can subclass extend this to add more details for specific games.
+        """
+        return self._metadata
+
+    def _pre_round_setup(self, agents: list[Player]):
+        """Copy agent codebases into game's container"""
+        for agent in agents:
+            # First make sure that the folder in the game container is removed
+            # This is important for 2 reasons:
+            # 1. Subtle differences in docker cp behavior regarding to trailing slashes
+            #    depending on whether the destination exists
+            # 2. If files are removed from the agent container, they should also be removed
+            #    from the game container
+            self.logger.debug(f"Copying {agent.name}'s codebase")
+            assert_zero_exit_code(self.environment.execute(f"rm -rf /{agent.name}"), logger=self.logger)
+            copy_between_containers(
+                src_container=agent.environment,
+                dest_container=self.environment,
+                src_path=DIR_WORK,
+                dest_path=f"/{agent.name}",
+            )
+
+        assert_zero_exit_code(
+            self.environment.execute(f"mkdir -p {self.log_env}"),
+            logger=self.logger,
+        )
+
+    def run_round(self, agents: list[Player], round_num: int, *, copy_logs: bool = True) -> RoundStats:
+        """
+        Run a single round of the game with the given agents.
+
+        Returns the log output, result output, and winner name. All bookkeeping should be
+        handled by the tournament class.
+        """
+        all_names = {agent.name for agent in agents}
+        assert len(all_names) == len(agents), "All agents must have unique names"
+
+        random.shuffle(agents)  # Shuffle to ensure fairness in case of positional advantages
+        stats = RoundStats(round_num, agents)
+        validated: list[Player] = []
+        for a in agents:
+            is_valid, error = self.validate_code(a)
+            if not is_valid:
+                self.logger.warning(f"Agent {a.name} failed submission validation: {error}")
+                stats.player_stats[a.name].invalid_reason = error
+                continue
+            self.logger.info(f"Agent {a.name} passed submission validation")
+            stats.player_stats[a.name].valid_submit = True
+            validated.append(a)
+
+        sims = self.config["game"]["sims_per_round"]
+        if len(validated) > 1:
+            self._pre_round_setup(validated)
+            self.execute_round(validated)
+            if copy_logs:
+                self.copy_logs_from_env(round_num)
+            self.get_results(validated, round_num, stats)
+        elif len(validated) == 1:
+            self.logger.info(f"Only one valid agent ({validated[0].name}), automatic win")
+            stats.winner = validated[0].name
+            stats.scores[validated[0].name] = sims
+            stats.player_stats[validated[0].name].score = sims
+        else:
+            self.logger.info("No valid agents, no winner this round (Default tie)")
+            stats.winner = RESULT_TIE
+            # Split points evenly
+            points = sims * 1.0 / len(agents)
+            for a in agents:
+                stats.scores[a.name] = points
+                stats.player_stats[a.name].score = points
+        return stats
+
+    @abstractmethod
+    def get_results(self, agents: list[Player], round_num: int, stats: RoundStats):
+        """Determine the winner of the game based on the result output.
+        Modifies the stats object in place.
+
+        Args:
+            agents: List of agents participating in the round
+        """
+        pass
+
+    @abstractmethod
+    def execute_round(self, agents: list[Player]):
+        """Subclasses implement their game-specific logic here.
+        This is the low level implementation, you probably want to use run_round instead, which
+        includes the pre-round setup, post-round setup, and winner determination.
+        """
+        pass
+
+    @abstractmethod
+    def validate_code(self, agent: Player) -> tuple[bool, str | None]:
+        """Verify that the given agent can be run by the game.
+
+        Args:
+            agent: The agent to verify
+
+        Returns:
+            Boolean indicating whether the agent passed verification
+            Optional string indicating reason for failure
+        """
+        pass

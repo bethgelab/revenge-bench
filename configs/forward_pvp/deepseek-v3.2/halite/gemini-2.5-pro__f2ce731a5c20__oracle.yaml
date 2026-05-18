@@ -1,0 +1,127 @@
+# Forward PvP: gemini-2.5-pro__f2ce731a5c20 -- condition: oracle
+# Game: Halite, OOD distance: 0.0509, best round: 1
+# Model: openai/deepseek-v3.2
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): deepseek-v3.2, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: Halite
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/halite/gemini-2.5-pro__f2ce731a5c20
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/deepseek-v3.2
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called Halite.
+    Halite is a multi-player turn-based strategy game where bots compete on a rectangular grid to capture territory and accumulate strength.
+    Players control pieces that can move across the map to conquer neutral and enemy territory, with each cell providing production that increases the strength of pieces occupying it.
+    The goal is to control the most territory by the end of the game through strategic expansion, consolidation of forces, and tactical combat decisions.
+
+    You have the choice of writing your Halite bot in one of four programming languages: C, C++, OCaml, or Rust.
+    Example implementations can be found under the `airesources/` folder.
+    Your submission should be stored in the `submission/` folder. This folder currently contains an example C bot, but feel free to use any of the supported languages.
+    Please make sure your main file is named `main.<ext>`, where `<ext>` is the appropriate file extension for your chosen programming language.
+    You may include additional files as needed, but please ensure:
+    1. The `submission/` folder contains only files relevant to your bot.
+    2. The `submission/` folder ONLY contains a single bot (no multiple bots in one submission).
+    3. Your bot can be compiled. See `runGame.sh` under the corresponding `submission/<language>/` folder to see how we will compile and run your bot.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your bot. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is in `submission/`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```c
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <time.h>
+
+    #include "hlt.h"
+
+    #define BOT_NAME "MyCBot"
+    #define STRENGTH_BUILD_MULTIPLIER 3
+
+    // Function to shuffle an array of integers
+    void shuffle(int *array, size_t n) {
+        if (n > 1) {
+            size_t i;
+            for (i = 0; i < n - 1; i++) {
+                size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
+                int t = array[j];
+                array[j] = array[i];
+                array[i] = t;
+            }
+        }
+    }
+
+    int main(void) {
+
+        GAME game;
+        int x, y;
+
+        srand(time(NULL));
+
+        game = GetInit();
+        SendInit(BOT_NAME);
+
+        while (1) {
+
+            GetFrame(game);
+            SITE neighbor;
+            int direction;
+            int directions[] = {1, 2, 3, 4}; // N, E, S, W
+
+
+            for (x = 0 ; x < game.width ; x++) {
+                for (y = 0 ; y < game.height ; y++) {
+                    if (game.owner[x][y] == game.playertag) {
+                        if (game.strength[x][y] > game.production[x][y] * STRENGTH_BUILD_MULTIPLIER) {
+                            direction = STILL;
+                            shuffle(directions, 4); // Shuffle directions
+                            for (int i = 0; i < 4; i++) {
+                                int d = directions[i];
+                                neighbor = GetSiteFromMovement(game, x, y, d);
+                                if (neighbor.owner != game.playertag && game.strength[x][y] > neighbor.strength) {
+                                    direction = d;
+                                    break;
+                                }
+                            }
+
+                            SetMove(game, x, y, direction);
+                        }
+                    }
+                }
+            }
+
+            SendFrame(game);
+        }
+
+        return 0;
+    }
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

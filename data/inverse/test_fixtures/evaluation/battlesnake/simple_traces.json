@@ -1,0 +1,7 @@
+[
+  {"state": {"you": {"head": {"x": 5, "y": 5}, "body": [{"x": 5, "y": 5}, {"x": 5, "y": 4}, {"x": 5, "y": 3}], "health": 100}, "board": {"width": 11, "height": 11, "food": [{"x": 5, "y": 7}], "snakes": []}}, "action": "up"},
+  {"state": {"you": {"head": {"x": 5, "y": 6}, "body": [{"x": 5, "y": 6}, {"x": 5, "y": 5}, {"x": 5, "y": 4}], "health": 99}, "board": {"width": 11, "height": 11, "food": [{"x": 5, "y": 7}], "snakes": []}}, "action": "up"},
+  {"state": {"you": {"head": {"x": 5, "y": 7}, "body": [{"x": 5, "y": 7}, {"x": 5, "y": 6}, {"x": 5, "y": 5}, {"x": 5, "y": 4}], "health": 100}, "board": {"width": 11, "height": 11, "food": [{"x": 3, "y": 7}], "snakes": []}}, "action": "left"},
+  {"state": {"you": {"head": {"x": 4, "y": 7}, "body": [{"x": 4, "y": 7}, {"x": 5, "y": 7}, {"x": 5, "y": 6}, {"x": 5, "y": 5}], "health": 99}, "board": {"width": 11, "height": 11, "food": [{"x": 3, "y": 7}], "snakes": []}}, "action": "left"},
+  {"state": {"you": {"head": {"x": 3, "y": 7}, "body": [{"x": 3, "y": 7}, {"x": 4, "y": 7}, {"x": 5, "y": 7}, {"x": 5, "y": 6}, {"x": 5, "y": 5}], "health": 100}, "board": {"width": 11, "height": 11, "food": [{"x": 8, "y": 2}], "snakes": []}}, "action": "right"}
+]

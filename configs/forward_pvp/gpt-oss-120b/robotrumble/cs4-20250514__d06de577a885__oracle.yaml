@@ -1,0 +1,156 @@
+# Forward PvP: cs4-20250514__d06de577a885 — condition: oracle
+# Game: RobotRumble, OOD distance: 0.0122, best round: 1
+# Model: openai/gpt-oss-120b
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): gpt-oss-120b, oracle condition
+
+tournament:
+  rounds: 5
+game:
+  name: RobotRumble
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robotrumble/cs4-20250514__d06de577a885
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-oss-120b
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RobotRumble.
+    RobotRumble is a turn-based coding battle where you program a team of robots to move, attack, and outmaneuver your opponent on a 19x19 grid.
+    Each player controls a team of Soldier units (Blue vs Red). Each unit independently executes your function, choosing to Move or Attack in a cardinal direction. The game lasts up to 100 turns.
+    Every decision is driven by your code, and victory comes from crafting logic that positions robots smartly, times attacks well, and adapts over the match.
+    NOTE: Please ensure that your code runs efficiently (under 60 seconds). Code that exceeds this run time will automatically forfeit the round.
+    Your bot is a JavaScript file `robot.js` at the top level of your workspace.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your robot team. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `robot.js`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```javascript
+    function robot(state, unit) {
+        // Get enemy and ally units
+        const enemies = state.objsByTeam(state.otherTeam);
+        const allies = state.objsByTeam(state.ourTeam);
+
+        if (enemies.length === 0) {
+            return null; // No enemies left
+        }
+
+        // Helper function to check if a position is free
+        function isPositionFree(coords) {
+            const obj = state.objByCoords(coords);
+            return !obj || (obj.objType !== 'Terrain' && obj.objType !== 'Unit');
+        }
+
+        // Helper function to move in a direction with fallbacks
+        function moveWithFallback(direction) {
+            const nextCoords = unit.coords.add(direction);
+            if (isPositionFree(nextCoords)) {
+                return Action.move(direction);
+            }
+
+            // Try alternative directions
+            const alternatives = [direction.rotateCw, direction.rotateCcw];
+            for (const altDir of alternatives) {
+                if (isPositionFree(unit.coords.add(altDir))) {
+                    return Action.move(altDir);
+                }
+            }
+
+            return null; // Can't move
+        }
+
+        // Count allies in a square area around a position
+        function countAlliesNear(coords, radius) {
+            let count = 0;
+            for (let i = -radius; i <= radius; i++) {
+                for (let j = -radius; j <= radius; j++) {
+                    const checkCoords = new Coords(coords.x + i, coords.y + j);
+                    const obj = state.objByCoords(checkCoords);
+                    if (obj && obj.team === unit.team && obj.id !== unit.id) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        // ABSOLUTE PRIORITY: Attack ANY adjacent enemy immediately
+        // Use Round 7's reliable approach - simple for loop with distanceTo
+        for (const enemy of enemies) {
+            const distance = unit.coords.distanceTo(enemy.coords);
+            if (distance === 1) {
+                const direction = unit.coords.directionTo(enemy.coords);
+                return Action.attack(direction);
+            }
+        }
+
+        // Find the closest enemy - use distanceTo like Round 7, not walkingDistanceTo
+        const closestEnemy = _.minBy(enemies, e => 
+            e.coords.distanceTo(unit.coords) + e.health/10
+        );
+
+        const distance = unit.coords.distanceTo(closestEnemy.coords);
+        const direction = unit.coords.directionTo(closestEnemy.coords);
+
+        // Look for high-priority targets (enemies attacking our allies) - attack them first
+        const priorityTarget = _.find(enemies, enemy => {
+            const threatenedAlly = _.find(allies, ally => 
+                ally.id !== unit.id && ally.coords.distanceTo(enemy.coords) === 1
+            );
+
+            if (threatenedAlly) {
+                const distanceToThreat = unit.coords.distanceTo(enemy.coords);
+                return distanceToThreat <= 3; // We can reach the threat quickly
+            }
+            return false;
+        });
+
+        if (priorityTarget) {
+            const priorityDirection = unit.coords.directionTo(priorityTarget.coords);
+            return moveWithFallback(priorityDirection);
+        }
+
+        // Only consider retreat if we're critically weak AND significantly outnumbered
+        if (unit.health === 1 && distance <= 2) {
+            const nearbyAllies = countAlliesNear(unit.coords, 2);
+            const nearbyEnemies = enemies.filter(e => 
+                e.coords.distanceTo(unit.coords) <= 2
+            ).length;
+
+            // Only retreat if we have no allies nearby and multiple enemies
+            if (nearbyAllies === 0 && nearbyEnemies >= 2) {
+                const retreatDirection = direction.opposite;
+                const retreatAction = moveWithFallback(retreatDirection);
+                if (retreatAction) return retreatAction;
+            }
+        }
+
+        // Default behavior: aggressively move toward closest enemy (like chaser)
+        return moveWithFallback(direction);
+    }
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

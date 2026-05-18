@@ -1,0 +1,219 @@
+# Forward PvP: cs4-5-20250929__ef774852ce8f -- condition: recovered
+# Game: RobotRumble, OOD distance: 0.0498, best round: 5
+# Model: openai/kimi-k2.6
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): kimi-k2.6, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: RobotRumble
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robotrumble/cs4-5-20250929__ef774852ce8f
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/kimi-k2.6
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RobotRumble.
+    RobotRumble is a turn-based coding battle where you program a team of robots to move, attack, and outmaneuver your opponent on a 19x19 grid.
+    Each player controls a team of Soldier units (Blue vs Red). Each unit independently executes your function, choosing to Move or Attack in a cardinal direction. The game lasts up to 100 turns.
+    Every decision is driven by your code, and victory comes from crafting logic that positions robots smartly, times attacks well, and adapts over the match.
+    NOTE: Please ensure that your code runs efficiently (under 60 seconds). Code that exceeds this run time will automatically forfeit the round.
+    Your bot is a JavaScript file `robot.js` at the top level of your workspace.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your robot team. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `robot.js`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```javascript
+    function robot(state, unit) {
+        // Determine opposing team
+        const enemyTeam = (unit.team === Team.Blue) ? Team.Red : Team.Blue;
+        const enemies = state.objsByTeam(enemyTeam) || [];
+
+        const ux = unit.coords.x;
+        const uy = unit.coords.y;
+
+        // Helper: get object at coords (wall/unit etc.)
+        function objAt(nx, ny) {
+            return state.objByCoords(new Coords(nx, ny));
+        }
+
+        // Helper: is move into dir free?
+        function canMoveDir(dir) {
+            const dx = dir.toCoords.x;
+            const dy = dir.toCoords.y;
+            const nx = ux + dx;
+            const ny = uy + dy;
+            // Tile is free only if no object (no wall, no unit)
+            return !objAt(nx, ny);
+        }
+
+        // Fallback movement: try dir; if blocked, rotate clockwise; if still blocked, rotate counterclockwise; else return original
+        function moveWithFallback(dir) {
+            if (canMoveDir(dir)) return Action.move(dir);
+            const cw = dir.rotateCw;
+            if (canMoveDir(cw)) return Action.move(cw);
+            const ccw = dir.rotateCcw;
+            if (canMoveDir(ccw)) return Action.move(ccw);
+            // If all blocked, attempt original direction anyway
+            return Action.move(dir);
+        }
+
+        // Enemy detection at adjacent offsets
+        function enemyAt(dx, dy) {
+            const o = objAt(ux + dx, uy + dy);
+            return o && o.team && o.team !== unit.team;
+        }
+
+        // Build list of adjacent enemy directions
+        const adjacents = [];
+        if (enemyAt(-1, 0)) adjacents.push(Direction.West);
+        if (enemyAt(1, 0)) adjacents.push(Direction.East);
+        if (enemyAt(0, -1)) adjacents.push(Direction.North);
+        if (enemyAt(0, 1)) adjacents.push(Direction.South);
+
+        // If adjacent enemies present
+        if (adjacents.length > 0) {
+            // Retreat behavior when low health: move away from adjacent enemies
+            if (unit.health <= 1) {
+                // Opposite map
+                const opposite = {
+                    West: Direction.East,
+                    East: Direction.West,
+                    North: Direction.South,
+                    South: Direction.North,
+                };
+                // Prepare preferences: start with opposites of adjacents (unique, in order of typical retreats)
+                const pref = [];
+                for (const d of adjacents) {
+                    const name = d.name || (d.toString && d.toString()) || '';
+                    // Use mapping by identity comparison instead of name to be safe
+                    if (d === Direction.West && !pref.includes(Direction.East)) pref.push(Direction.East);
+                    if (d === Direction.East && !pref.includes(Direction.West)) pref.push(Direction.West);
+                    if (d === Direction.North && !pref.includes(Direction.South)) pref.push(Direction.South);
+                    if (d === Direction.South && !pref.includes(Direction.North)) pref.push(Direction.North);
+                }
+                // Add remaining directions as fallbacks (order: South, North, East, West) to align with observed tendencies
+                const allDirs = [Direction.South, Direction.North, Direction.East, Direction.West];
+                for (const d of allDirs) {
+                    if (!pref.includes(d)) pref.push(d);
+                }
+
+                // Helper to compute if a move increases distance to all adjacent enemies
+                function increasesAll(dir) {
+                    const mdx = dir.toCoords.x, mdy = dir.toCoords.y;
+                    const nx = ux + mdx, ny = uy + mdy;
+                    // Adjacent enemy positions are 1 step away; after moving, distance should be > 1
+                    for (const d of adjacents) {
+                        const ex = ux + d.toCoords.x;
+                        const ey = uy + d.toCoords.y;
+                        const dist = Math.abs(nx - ex) + Math.abs(ny - ey);
+                        if (dist <= 1) return false;
+                    }
+                    return true;
+                }
+
+                // Try to pick a move that increases distance to all adjacent enemies
+                for (const d of pref) {
+                    if (canMoveDir(d) && increasesAll(d)) {
+                        return Action.move(d);
+                    }
+                }
+                // If none strictly increases distance to all, choose the first passable preferred direction
+                for (const d of pref) {
+                    if (canMoveDir(d)) {
+                        return Action.move(d);
+                    }
+                }
+                // As a last resort, fallback from the first preferred direction
+                return moveWithFallback(pref[0] || Direction.South);
+            }
+
+            // Otherwise (health >= 2), attack with priority: West > East > North > South
+            const attackOrder = [Direction.West, Direction.East, Direction.North, Direction.South];
+            for (const d of attackOrder) {
+                const dx = d.toCoords.x, dy = d.toCoords.y;
+                if (enemyAt(dx, dy)) {
+                    return Action.attack(d);
+                }
+            }
+            // If somehow adjacent flags inconsistent, fall back to movement away from a nearest enemy
+            // (very rare, but keeps behavior defined)
+        }
+
+        // If no visible enemies, default movement to South with passability handling
+        if (!enemies || enemies.length === 0) {
+            return moveWithFallback(Direction.South);
+        }
+
+        // Move toward nearest enemy using axis preference (larger |dx| or |dy|) and tie-breaking
+        let best = null, bestDist = Infinity, bestDx = 0, bestDy = 0;
+        for (let i = 0; i < enemies.length; i++) {
+            const e = enemies[i];
+            const dx = e.coords.x - ux;
+            const dy = e.coords.y - uy;
+            const dist = Math.abs(dx) + Math.abs(dy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = e;
+                bestDx = dx;
+                bestDy = dy;
+            }
+        }
+
+        if (!best) {
+            return moveWithFallback(Direction.South);
+        }
+
+        const adx = Math.abs(bestDx);
+        const ady = Math.abs(bestDy);
+
+        // Choose axis with larger distance
+        let desiredDir = null;
+        if (adx > ady) {
+            desiredDir = bestDx > 0 ? Direction.East : Direction.West;
+        } else if (ady > adx) {
+            desiredDir = bestDy > 0 ? Direction.South : Direction.North;
+        } else {
+            // Tie cases (|dx| == |dy|):
+            // Prefer West when dx < 0; otherwise prefer vertical by dy sign (dx > 0: North if dy < 0, else South)
+            if (bestDx < 0) {
+                desiredDir = Direction.West;
+            } else if (bestDx > 0) {
+                desiredDir = bestDy > 0 ? Direction.South : Direction.North;
+            } else {
+                // degenerate tie fallback
+                desiredDir = Direction.South;
+            }
+        }
+
+        return moveWithFallback(desiredDir);
+    }
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

@@ -1,0 +1,89 @@
+system_template: |
+  You are a helpful assistant interacting continuously with a computer.
+  You'll be editing a codebase to recover another agent's strategy from game traces.
+
+instance_template: |
+  ## Task Description
+
+  {{game_description}}
+
+  ## Strategy Recovery Guidelines
+
+  Your objective is to write code that produces the SAME actions as the target agent.
+  This is NOT about winning the game - it's about matching the target's behavior exactly.
+
+  **How evaluation works (IMPORTANT):**
+  - You do NOT play the game directly
+  - The target plays against an opponent, generating game traces
+  - Your code is evaluated OFFLINE: we call your code with each state the target saw
+  - Accuracy = how often your action matches what the target actually did
+  - Goal: If you were in the target's exact position, would you make the same decision?
+
+  The key files are in this codebase ({{working_dir}}):
+   - `main.py`: Your code to edit (must match target's behavior)
+   - `docs/`: Game documentation
+   - `/logs/rounds/`: Traces from previous rounds
+
+  ## Trace Files (IMPORTANT)
+
+  After each round, traces are saved to `/logs/rounds/{round_num}/`:
+   - `traces.json`: **START HERE** - Summary with mean action distance and actions with nonzero distance
+   - `sim_*.jsonl` or `sim_*.json`: Raw game traces (state-action pairs)
+   - `results.json`: Round statistics
+
+  ### traces.json Format
+  ```json
+  {
+    "mean_distance": 0.75,         // Mean action distance (goal: 0.0 = perfect match)
+    "total_actions": 100,           // Total states evaluated
+    "total_distance": 75.0,         // Sum of action distances
+    "nonzero_distances": [          // Actions with distance > 0 (with full state)
+      {
+        "turn": 5,
+        "learner_action": "up",
+        "target_action": "down",
+        "distance": 1.0,
+        "state": {...}              // The exact game state - use this to debug!
+      },
+      ...
+    ]
+  }
+  ```
+
+  ## Workflow
+
+  1. **Read traces.json first** - Check your current mean action distance (lower is better, 0.0 = perfect)
+  2. **Analyze nonzero_distances** - Each has the full state, your action, and target's action
+  3. **Look for patterns** - What rule is the target following that you're missing?
+  4. **Update main.py** - Implement the pattern you discovered
+  5. **Submit** - Your code is evaluated after each round
+
+  {% if context_mode == "reset" %}This is round {{round}} of {{rounds}}.
+
+  ## Your Distance Progress (lower is better, 0.0 = perfect match)
+  {{distance_progress}}
+
+  Each round starts fresh with no knowledge of previous actions.
+  Leave notes and analysis in the codebase for future rounds.
+  Use README_agent.md at repository root to pass instructions to your next round.
+  {% else %}This is round {{round}} of {{rounds}}. Your conversation history persists
+  across rounds — earlier turns, tool outputs, and your own reasoning remain
+  visible (older outputs may be compacted to summaries to save context). At the
+  end of each round, the system appends a "Round N evaluation complete" message
+  with the new distance and traces path; that message is pinned and never
+  compacted away.
+
+  ## Your Distance Progress (lower is better, 0.0 = perfect match)
+  {{distance_progress}}{% endif %}
+
+  IMPORTANT: Store all changes in {{working_dir}} or subdirectories.
+
+  ## Tips
+
+  {% if context_mode == "reset" %}1. Check README_agent.md for notes from previous rounds.{% else %}1. Re-read prior turns: your earlier analysis is still in this conversation.{% endif %}
+  2. Start by reading `/logs/rounds/{previous_round}/traces.json` to see your mean action distance.
+  3. Focus on the `nonzero_distances` array - each entry shows where your action differed from target's.
+  4. The target likely follows simple rules (chase food, avoid walls, prefer certain directions).
+  5. Test your hypothesis by checking if it explains ALL the nonzero distance entries.
+  6. You can write analysis scripts to process the nonzero distances programmatically.
+  7. Remember `/logs/` is outside your working directory when writing analyses.

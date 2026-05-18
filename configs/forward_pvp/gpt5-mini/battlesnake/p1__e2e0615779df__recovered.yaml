@@ -1,0 +1,194 @@
+# Forward PvP: p1__e2e0615779df — condition: recovered
+# Game: BattleSnake, OOD distance: 0.0167, best round: 5
+# Model: openai/gpt-5-mini
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): gpt-5-mini, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: BattleSnake
+  sims_per_round: 30
+  record_ratio: 1.0
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/battlesnake/p1__e2e0615779df
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/gpt-5-mini
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called BattleSnake.
+    Your bot (`main.py`) controls a snake on a grid-based board.
+    Snakes collect food, avoid collisions, and try to outlast their opponents.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your snake. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is `main.py`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    import random
+    import typing
+
+    def info() -> typing.Dict:
+        return {
+            "apiversion": "1",
+            "author": "",
+            "color": "#888888",
+            "head": "default",
+            "tail": "default",
+        }
+
+    def start(game_state: typing.Dict):
+        print("GAME START")
+
+    def end(game_state: typing.Dict):
+        print("GAME OVER")
+
+    def move(game_state: typing.Dict) -> typing.Dict:
+        my_head = game_state["you"]["head"]
+        my_body = game_state["you"]["body"]
+        board = game_state["board"]
+        board_width = board["width"]
+        board_height = board["height"]
+
+        # Determine neck to avoid moving backwards
+        neck = None
+        if len(my_body) >= 2:
+            neck = my_body[1]
+
+        directions = {
+            "up":    (0, 1),
+            "down":  (0, -1),
+            "left":  (-1, 0),
+            "right": (1, 0),
+        }
+
+        # Occupied positions by any snake bodies (including ours)
+        occupied = set()
+        for s in board["snakes"]:
+            for seg in s["body"]:
+                occupied.add((seg["x"], seg["y"]))
+
+        def is_safe_dir(dir_name: str) -> bool:
+            dx, dy = directions[dir_name]
+            nx = my_head["x"] + dx
+            ny = my_head["y"] + dy
+            # Avoid moving backwards into neck
+            if neck is not None and nx == neck["x"] and ny == neck["y"]:
+                return False
+            # Stay within bounds
+            if nx < 0 or nx >= board_width or ny < 0 or ny >= board_height:
+                return False
+            # Avoid immediate collision with any body segment
+            if (nx, ny) in occupied:
+                return False
+            return True
+
+        # Build list of safe moves and their resulting coords
+        safe_moves = []
+        for m in ["up", "down", "left", "right"]:
+            if is_safe_dir(m):
+                dx, dy = directions[m]
+                safe_moves.append((m, my_head["x"] + dx, my_head["y"] + dy))
+
+        if not safe_moves:
+            # No safe moves detected; default to down as last resort
+            print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
+            return {"move": "down"}
+
+        # Perimeter clockwise preference: if on the edge, prefer CW perimeter move when safe
+        def on_perimeter(x, y, w, h):
+            return x == 0 or x == w-1 or y == 0 or y == h-1
+
+        def cw_perimeter_dir(x, y, w, h):
+            # Clockwise along the border:
+            # bottom (y=0): go right; right (x=w-1): go up; top (y=h-1): go left; left (x=0): go down
+            if y == 0 and x < w-1:
+                return "right"
+            if x == w-1 and y < h-1:
+                return "up"
+            if y == h-1 and x > 0:
+                return "left"
+            if x == 0 and y > 0:
+                return "down"
+            # Corners (choose CW turn)
+            if x == 0 and y == 0:
+                return "right"
+            if x == w-1 and y == 0:
+                return "up"
+            if x == w-1 and y == h-1:
+                return "left"
+            if x == 0 and y == h-1:
+                return "down"
+            return None
+
+        if False and on_perimeter(my_head["x"], my_head["y"], board_width, board_height):
+            cw = cw_perimeter_dir(my_head["x"], my_head["y"], board_width, board_height)
+            if cw and any(m == cw for (m, _, _) in safe_moves):
+                print(f"MOVE {game_state['turn']}: {cw}")
+                return {"move": cw}
+        foods = board.get("food", [])
+        if foods:
+            def min_dist_to_food(nx, ny):
+                return min(abs(nx - f["x"]) + abs(ny - f["y"]) for f in foods) if foods else 0
+
+            # Compute minimal distance after each safe move
+            distances = [(m, nx, ny, min_dist_to_food(nx, ny)) for (m, nx, ny) in safe_moves]
+            best_val = min(d for _, _, _, d in distances)
+            best_moves = [ (m, nx, ny) for (m, nx, ny, d) in distances if d == best_val ]
+
+            # If both vertical and horizontal moves are tied for best, prefer vertical
+            vertical = [t for t in best_moves if t[0] in ("up", "down")]
+            horizontal = [t for t in best_moves if t[0] in ("left", "right")]
+            if vertical:
+                # Prefer vertical; tie-break deterministically: down > up
+                for pref in ["up", "down"]:
+                    for (m, _, _) in vertical:
+                        if m == pref:
+                            print(f"MOVE {game_state['turn']}: {m}")
+                            return {"move": m}
+            elif horizontal:
+                # Only horizontal options; tie-break deterministically: left > right
+                for pref in ["right", "left"]:
+                    for (m, _, _) in horizontal:
+                        if m == pref:
+                            print(f"MOVE {game_state['turn']}: {m}")
+                            return {"move": m}
+        # If no food or no reducing preference, choose deterministically among safe moves
+        # Prefer vertical directions first: up > down > left > right
+        for pref in ["up", "down", "left", "right"]:
+            if any(m == pref for (m, _, _) in safe_moves):
+                print(f"MOVE {game_state['turn']}: {pref}")
+                return {"move": pref}
+
+        # Fallback (shouldn't reach)
+        m = safe_moves[0][0]
+        print(f"MOVE {game_state['turn']}: {m}")
+        return {"move": m}
+
+    if __name__ == "__main__":
+        from server import run_server
+        run_server({"info": info, "start": start, "move": move, "end": end})
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

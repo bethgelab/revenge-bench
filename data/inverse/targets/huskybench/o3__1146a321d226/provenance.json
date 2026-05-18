@@ -1,0 +1,32 @@
+{
+  "source": "codeclash_viewer",
+  "game": "HuskyBench",
+  "model": "o3",
+  "tournament": "PvpTournament.HuskyBench.r15.s100.p2.gemini-2.5-pro.o3.251018161148.ce92de8a-e347-48d9-8e42-27a8e7a16f63-uuid",
+  "source_path": "data/inverse/extracted_strategies/HuskyBench/PvpTournament.HuskyBench.r15.s100.p2.gemini-2.5-pro.o3.251018161148.ce92de8a-e347-48d9-8e42-27a8e7a16f63-uuid/final/o3",
+  "lines": 258,
+  "content_hash": "1146a321d226",
+  "complexity_score": 72.5,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 72.5,
+    "loc": 258,
+    "func_count": 14,
+    "max_nesting_depth": 6,
+    "branch_count": 38,
+    "node_count": 1530,
+    "algorithm_score": 5,
+    "algorithms_found": [
+      "outs",
+      "bluff",
+      "range"
+    ],
+    "data_structure_score": 1
+  },
+  "elo": 1547.3,
+  "elo_rank": 11,
+  "elo_total": 40,
+  "elo_win_rate": 0.6,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

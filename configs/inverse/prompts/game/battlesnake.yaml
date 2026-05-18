@@ -1,0 +1,128 @@
+game_description: |
+  You are a programmer ({{player_id}}) learning to recover another agent's BattleSnake strategy.
+
+  ## Your Goal
+  Write code that produces the SAME actions as the target agent.
+  This is NOT about winning - it's about matching the target's behavior exactly.
+
+  ## The Game: BattleSnake
+  BattleSnake is a multiplayer snake game on an 11x11 grid.
+  - Your snake moves every turn: "up", "down", "left", or "right"
+  - Eat food to grow longer and gain health
+  - Avoid walls, your own body, and other snakes
+  - If you collide or run out of health, you die
+
+  ## How It Works (IMPORTANT)
+  Each round:
+  1. You PROBE first to test hypotheses about the target
+  2. You EDIT main.py based on probe results + traces
+  3. At round end, main simulation runs: target vs MULTIPLE opponents
+  4. You get traces showing target's actions against different opponents
+  5. Your main.py is evaluated for accuracy against target
+
+  ## Multi-Opponent Advantage
+
+  Each round the target plays against MULTIPLE different opponents. This gives
+  you **richer data** — you see how the target behaves in diverse game situations
+  within a single round.
+
+  **The target's strategy is FIXED and never changes.** Different opponents
+  create different board states, but the target's decision rules are constant.
+  Use this diversity to your advantage:
+
+  - **Find invariant rules** — what does the target ALWAYS do, regardless of
+    which opponent it faces? These are the core decision rules you need to code.
+  - **Cross-validate hypotheses** — if a rule holds against opponent A but not
+    opponent B, it's probably not the right rule. True target rules are universal.
+  - **Don't overfit to one opponent's traces** — build general rules that work
+    in any game situation, not just the specific positions you've seen.
+
+  ## IMPORTANT: Probe-First Workflow
+
+  **Always probe BEFORE editing main.py.** Probes are your primary tool for
+  understanding the target. Traces only show what happened — probes let you
+  run controlled experiments.
+
+  **Recommended workflow each round:**
+  1. Read traces.json — identify mismatches
+  2. Form a hypothesis (e.g., "target prefers food over safety")
+  3. Design a probe to test it (modify probe.py to create that scenario)
+  4. Run `echo "PROBE_SUBMIT"` and analyze results
+  5. Run 1-2 more probes to refine understanding
+  6. THEN edit main.py based on confirmed hypotheses
+
+  Probes are cheap and fast. Editing main.py without probing first is like
+  coding without testing — you'll waste rounds on wrong guesses.
+
+  ## Inline Probing (YOUR PRIMARY TOOL)
+
+  You can run probe simulations AT ANY TIME during editing!
+
+  `probe.py` is automatically seeded from your current `main.py` at the start of each round.
+  You just need to modify it to create the test scenario you want, then submit.
+
+  ### How to Probe
+  1. Edit `probe.py` to create a specific test scenario (e.g., always chase food, always hug walls)
+  2. Run `echo "PROBE_SUBMIT"` — system plays your probe.py AGAINST the target
+  3. Read the results to see what the target did in the situations your probe created
+
+  You get up to 5 probes per round. **Aim to use at least 2 per round.**
+
+  ### ⚠️ CRITICAL: Separate Exploration from Exploitation
+
+  **`probe.py` is your EXPERIMENT. `main.py` is your SUBMISSION. Keep them separate.**
+
+  Rules:
+  1. **NEVER edit main.py and probe.py in the same command.** Use separate steps.
+     - ❌ `sed -i '...' main.py probe.py` — this makes them identical, wasting the probe
+     - ✅ Edit probe.py → PROBE_SUBMIT → analyze → then edit main.py separately
+  2. **probe.py must be DIFFERENT from main.py.** If they're identical, the probe tells you nothing new — it just re-runs your current policy. Make probe.py test a specific hypothesis.
+  3. **After each probe, STOP and analyze before probing again.** Write down:
+     - What did you learn from the mismatch data?
+     - What should you change in main.py based on this?
+     - What should your next probe test?
+     Never submit consecutive probes without analysis in between.
+  4. **Only edit main.py AFTER you have probe evidence.** Each change to main.py should be justified by probe results showing the target behaves a certain way.
+
+  Think of it this way:
+  - **probe.py = laboratory** — run experiments here, it's safe to try wild things
+  - **main.py = production** — only deploy validated findings here
+
+  ### Probe Output Format
+  ```json
+  {
+    "probe_id": 1,
+    "description": "Your probe.py vs target",
+    "total_turns": 45,
+    "pairs": [
+      {
+        "turn": 5,
+        "probe_action": "up",
+        "target_action": "right",
+        "target_state": {...}
+      }
+    ]
+  }
+  ```
+
+  ### Probing Strategy
+  - **Create specific scenarios**: Make probe.py behave in ways that force interesting situations
+  - **Test hypotheses**: "Does target prefer food over safety?" - probe can help answer
+  - **Explore edge cases**: See what target does in corners, near walls, when chasing
+  - **Use probe_action vs target_action**: Direct comparison in same game state!
+  - **Look for invariants**: Target rules that hold across ALL opponents are the most reliable
+
+  ## Key Files
+  - `main.py` - Your recovered policy (EDIT THIS - evaluated for accuracy). **Only edit after probing.**
+  - `probe.py` - Your experiment instrument. **Must differ from main.py.** Auto-seeded each round.
+  - `docs/` - Game documentation and API reference
+  - `/logs/rounds/{N}/traces.json` - Accuracy results and mismatches
+  - `/logs/rounds/{N}/sim_*.jsonl` - Raw game traces (target vs MULTIPLE opponents)
+
+  ## Tips
+  - **PROBE FIRST** — don't jump straight to editing main.py
+  - **Keep probe.py different from main.py** — identical probes waste your probe budget
+  - After each probe, write a brief analysis before probing again
+  - **Build opponent-invariant rules** — focus on what the target ALWAYS does
+  - Traces from different opponents reveal different aspects of the target's strategy
+  - probe.py is safe to experiment with — main.py is your graded submission

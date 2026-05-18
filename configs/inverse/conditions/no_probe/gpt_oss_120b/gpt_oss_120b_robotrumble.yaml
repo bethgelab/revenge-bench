@@ -1,0 +1,61 @@
+# No-Probe Condition (Full Pool): RobotRumble — GPT-OSS-120B
+#
+# Top 15 targets by ELO rank, 5 rounds, step_limit=30, cost_limit=$1
+# Truncation: max_output_chars=3000, keep_recent_observations=8, max_past_output_chars=500
+
+name: gpt_oss_120b_no_probe
+
+strategy_pool:
+  pool_dir: data/inverse/targets/robotrumble
+  opponent_pool_dir: data/inverse/targets/robotrumble
+  fixed_target: false
+  seed: 42
+  top_elo_targets: 15
+
+tournament:
+  rounds: 5
+  type: interventionist
+  max_probes_per_round: 0
+  sims_per_probe: 3
+  opponents_per_round: 20
+
+game:
+  name: RobotRumble
+  sims_per_round: 20
+  args:
+    raw: true
+
+players:
+  - agent: inverse
+    name: learner
+    editable: true
+    config:
+      agent:
+        <<: !include inverse/prompts/system/interventionist.yaml
+        step_limit: 30
+        cost_limit: 1.0
+        max_output_chars: 3000
+        keep_recent_observations: 8
+        max_past_output_chars: 500
+        max_context_chars: 100000
+      model:
+        model_name: openai/gpt-oss-120b
+        cost_tracking: ignore_errors
+        model_kwargs:
+          api_base: http://localhost:8000/v1
+          api_key: dummy
+
+  - agent: static
+    name: target
+    editable: false
+    args:
+      source_path: data/inverse/targets/robotrumble  # overridden by pool
+
+  - agent: static
+    name: opponent
+    editable: false
+    args:
+      source_path: data/inverse/targets/robotrumble  # overridden per-round by pool
+
+prompts:
+  <<: !include inverse/prompts/game/no_probe/robotrumble.yaml

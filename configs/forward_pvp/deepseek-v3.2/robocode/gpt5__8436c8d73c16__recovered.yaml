@@ -1,0 +1,212 @@
+# Forward PvP: gpt5__8436c8d73c16 -- condition: recovered
+# Game: RoboCode, OOD distance: 0.0575, best round: 2
+# Model: openai/deepseek-v3.2
+#
+# Player 1 (target): static agent, original code
+# Player 2 (challenger): deepseek-v3.2, recovered condition
+
+tournament:
+  rounds: 5
+game:
+  name: RoboCode
+  sims_per_round: 30
+  record_ratio: 1.0
+  args:
+    nodisplay: true
+    nosound: true
+players:
+- agent: static
+  name: target
+  editable: false
+  args:
+    source_path: data/inverse/targets/robocode/gpt5__8436c8d73c16
+- agent: mini
+  name: challenger
+  config:
+    agent: !include mini/default.yaml
+    model:
+      model_name: openai/deepseek-v3.2
+      cost_tracking: ignore_errors
+      model_kwargs:
+        api_base: http://localhost:8000/v1
+        api_key: dummy
+prompts:
+  game_description: |-
+    You are a software developer ({{player_id}}) competing in a coding game called RoboCode.
+    Robocode (Tank Royale) is a programming game where your code is the tank: each turn your bot sends intents -- speed plus body/gun/radar turn rates and firepower -- based on the game state it perceives via radar.
+    Your program decides how to move, aim, and fire in a deterministic, turn-based arena to outlast other bots.
+    Your bot logic must be written in Java and located in the `robots/custom/` directory.
+    Keep the main bot class named `MyTank.java`, but you can include additional Java files if you'd like.
+
+    The game is played in 5 rounds. For every round, you (and your competitors) edit program code that controls your bot. This is round {{round}}.
+    After you and your competitor finish editing your codebases, the game is run automatically.
+
+    Your goal is to defeat your opponent. Anticipate their strategy and build a bot that counters it.
+    Your bot is in `robots/custom/`, located in {{working_dir}}.
+    {{working_dir}} is your codebase, which contains both your bot and supporting assets.
+    All of your commands will be executed in the {{working_dir}} directory (see notes below).
+
+    ## Opponent Intelligence
+
+    You have obtained your opponent's strategy code:
+
+    ```python
+    """Starter baseline for RoboCode strategy recovery.
+
+    This file is pre-seeded so evaluation works from Round 0.
+    Edit the move() function to match the target's behavior.
+    """
+    import math
+
+
+    def _clamp(x, lo, hi):
+        return max(lo, min(hi, x))
+
+
+    def _normalize_angle(deg):
+        """Normalize angle to [-180, 180) degrees."""
+        return (deg + 180) % 360 - 180
+
+
+    def _abs_bearing_to_enemy(state):
+        """Compute absolute bearing (degrees, clockwise from North) from my pos to enemy."""
+        dx = state["enemy_x"] - state["my_x"]
+        dy = state["enemy_y"] - state["my_y"]
+        return math.degrees(math.atan2(dx, dy)) % 360
+
+
+    def _wall_dist(state):
+        x, y = state["my_x"], state["my_y"]
+        W, H = state["arena_width"], state["arena_height"]
+        return min(x, y, W - x, H - y)
+
+
+    def move(state):
+        """Given the current game state, return a 5-component action dict.
+
+        Key geometric relationships:
+          abs_bearing    = atan2(enemy_x - my_x, enemy_y - my_y)  [clockwise from North]
+          gun_offset     = normalize(abs_bearing - my_gun_heading)
+          radar_offset   = normalize(abs_bearing - my_radar_heading)
+          body_offset    = normalize(abs_bearing - my_heading) = enemy_bearing
+        """
+        distance = state.get("enemy_distance", 0.0)
+
+        # If no enemy visible, spin radar to search; stay still otherwise
+        if distance <= 0:
+            # Search mode: keep moving, accelerate toward 8 based on current velocity sign
+            vcur = state.get("my_velocity", 0.0)
+            if vcur > 0:
+                vset = min(8.0, vcur + 1.0)
+            elif vcur < 0:
+                vset = max(-8.0, vcur - 1.0)
+            else:
+                vset = 0.0
+            return {
+                "velocity": vset,
+                "turn_body": 0.0,
+                "turn_gun": 0.0,
+                "turn_radar": 45.0,  # spin at max to search
+                "fire_power": 0.0,
+            }
+
+        abs_bearing = _abs_bearing_to_enemy(state)
+
+        # Gun: turn toward enemy with small increments (~5 deg clamp)
+        gun_offset = _normalize_angle(abs_bearing - state["my_gun_heading"])
+        turn_gun = _clamp(gun_offset, -0.5, 0.5)
+
+        # Radar: turn toward enemy (2x overshoot for radar lock) with small deadzone
+        radar_offset = _normalize_angle(abs_bearing - state["my_radar_heading"])
+        if abs(radar_offset) <= 0.0:
+            turn_radar = 0.0
+        else:
+            turn_radar = _clamp(2.0 * radar_offset, -45.0, 45.0)
+
+        # Body: threshold rule tuned by wall distance
+        eb = state["enemy_bearing"]
+        margin = 30.0
+        thresh = 70.0 if _wall_dist(state) < margin else 140.0
+        if abs(eb) <= thresh:
+            turn_body = 0.0
+        else:
+            turn_body = _clamp(eb, -1.0, 1.0)
+
+        # Movement: align velocity sign with enemy position; accelerate/brake with wall-aware stop
+        eb = state["enemy_bearing"]
+        eb_rad = math.radians(eb)
+        cosb = math.cos(eb_rad)
+        # desired movement direction: +1 forward if enemy in front (cos>0), -1 backward if behind (cos<0), 0 if exactly side-on
+        if abs(cosb) < 1e-9:
+            desired_sign = 0
+        else:
+            desired_sign = 1 if cosb > 0 else -1
+
+        # Wall-aware stop: if close to the nearest wall and desired movement points toward that wall, stop
+        def _nearest_wall_toward(state, desired_sign):
+            x, y = state["my_x"], state["my_y"]
+            W, H = state["arena_width"], state["arena_height"]
+            d_left, d_right, d_bottom, d_top = x, W - x, y, H - y
+            dmin = min(d_left, d_right, d_bottom, d_top)
+            # Movement vector for desired direction relative to current heading
+            if desired_sign == 0:
+                return False
+            head = math.radians(state["my_heading"])
+            vx = desired_sign * math.sin(head)
+            vy = desired_sign * math.cos(head)
+            # Check if moving toward nearest wall
+            toward = False
+            if dmin == d_left and vx < 0: toward = True
+            if dmin == d_right and vx > 0: toward = True
+            if dmin == d_bottom and vy < 0: toward = True
+            if dmin == d_top and vy > 0: toward = True
+            return toward, dmin
+
+        mv = state.get("my_velocity", 0.0)
+        # Stop if near and heading toward nearest wall
+        toward_info = _nearest_wall_toward(state, desired_sign)
+        if toward_info:
+            toward, dmin = toward_info
+            if toward and dmin < 50.0:
+                velocity = 0.0
+            else:
+                # Adjust speed toward desired motion
+                if desired_sign == 0:
+                    # gently decelerate toward 0
+                    if mv > 0:
+                        velocity = max(0.0, mv - 1.0)
+                    elif mv < 0:
+                        velocity = min(0.0, mv + 1.0)
+                    else:
+                        velocity = 0.0
+                else:
+                    # Same sign or from rest: accelerate by +1; opposite sign: brake by -2
+                    if mv == 0.0 or (mv > 0 and desired_sign > 0) or (mv < 0 and desired_sign < 0):
+                        velocity = desired_sign * min(8.0, abs(mv) + 1.0)
+                    else:
+                        mag = max(0.0, abs(mv) - 2.0)
+                        velocity = (mag if mv > 0 else -mag)
+        else:
+            # Fallback (shouldn't occur): keep current velocity
+            velocity = mv
+
+        # Firing: TrackFire-style when nearly aligned and gun is cool
+        gun_heat = state.get("my_gun_heat", 1.0)
+        if gun_heat <= 0 and abs(gun_offset) <= 3.0:
+            # Power = min(3 - |bearingFromGun|, energy - .1), clamped to [0,3]
+            desired = min(3.0 - abs(gun_offset), state.get("my_energy", 0.0) - 0.1)
+            fire_power = _clamp(desired if desired > 0 else 0.0, 0.0, 3.0)
+        else:
+            fire_power = 0.0
+
+        return {
+            "velocity": _clamp(velocity, -8.0, 8.0),
+            "turn_body": _clamp(turn_body, -10.0, 10.0),
+            "turn_gun": turn_gun,
+            "turn_radar": turn_radar,
+            "fire_power": _clamp(fire_power, 0.0, 3.0),
+        }
+
+    ```
+
+    Use this intelligence to inform your strategy. A well-designed bot that accounts for the opponent's tendencies will outperform a fragile exploit. Focus on writing robust, well-tested code first, then incorporate any insights from the opponent's logic as refinements.

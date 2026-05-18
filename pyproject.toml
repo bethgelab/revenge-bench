@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "revenge-bench"
+version = "0.0.0"
+description = "RevengeBench: reverse-engineering code-space policies from behavioral experiments"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+    {name = "RevengeBench Authors"},
+]
+dependencies = [
+    "codeclash",
+    "litellm",
+    "mini-swe-agent>=1.17.1,<2.0",
+    "portkey-ai",
+    "python-dotenv",
+    "ghapi",
+    "flask",
+    "jinja2",
+    "markupsafe",
+    "unidiff",
+    "trueskill",
+    "cdifflib",
+    "zstandard>=0.25.0",
+    "beautifulsoup4>=4.14.3",
+    "requests",
+    "tqdm",
+    "mcp>=1.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "ruff",
+    "Werkzeug",
+    "frozen-flask",
+]
+aws = ["boto3"]
+
+[project.scripts]
+revenge-bench = "revenge_bench.cli:main_cli"
+revenge-bench-pool-eval = "revenge_bench.scripts.inverse.run_pool_eval:main"
+
+[tool.uv.sources]
+codeclash = { path = "vendor/codeclash", editable = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["revenge_bench*"]
+
+[tool.setuptools.package-data]
+revenge_bench = [
+    "arenas/**/*.Dockerfile",
+    "arenas/**/*.def",
+    "arenas/**/*.js",
+    "arenas/**/main_seed.py",
+]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not slow'"
+norecursedirs = ["data", ".venv", "node_modules", "vendor/codeclash"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py311"
+exclude = [
+    ".git",
+    ".venv",
+    "vendor/codeclash",
+    "data",
+    "logs",
+    "site",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

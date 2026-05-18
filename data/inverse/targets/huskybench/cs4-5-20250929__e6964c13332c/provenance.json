@@ -1,0 +1,28 @@
+{
+  "source": "codeclash_viewer",
+  "game": "HuskyBench",
+  "model": "cs4-5-20250929",
+  "tournament": "PvpTournament.HuskyBench.r15.s100.p2.claude-sonnet-4-5-20250929.gpt-5-mini.251018182102.a0f3b06e-96fb-46ba-8ef1-140f7ef9306f-uuid",
+  "source_path": "data/inverse/extracted_strategies/HuskyBench/PvpTournament.HuskyBench.r15.s100.p2.claude-sonnet-4-5-20250929.gpt-5-mini.251018182102.a0f3b06e-96fb-46ba-8ef1-140f7ef9306f-uuid/final/cs4-5-20250929",
+  "lines": 138,
+  "content_hash": "e6964c13332c",
+  "complexity_score": 42.5,
+  "complexity_tier": "low",
+  "complexity_breakdown": {
+    "total": 42.5,
+    "loc": 138,
+    "func_count": 8,
+    "max_nesting_depth": 3,
+    "branch_count": 16,
+    "node_count": 562,
+    "algorithm_score": 0,
+    "algorithms_found": [],
+    "data_structure_score": 0
+  },
+  "elo": 1521.2,
+  "elo_rank": 13,
+  "elo_total": 40,
+  "elo_win_rate": 0.533,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

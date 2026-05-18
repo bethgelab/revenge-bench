@@ -1,0 +1,22 @@
+{
+  "source": "debug",
+  "game": "Halite",
+  "model": "hand-written",
+  "tournament": "debug",
+  "lines": 35,
+  "content_hash": "debug_still",
+  "complexity_score": 5,
+  "complexity_tier": "low",
+  "complexity_breakdown": {
+    "loc": 35,
+    "branch_count": 1,
+    "loop_count": 2,
+    "func_count": 1,
+    "strategy_score": 1,
+    "strategies_found": ["still_only"]
+  },
+  "elo": 800,
+  "elo_rank": 40,
+  "elo_total": 40,
+  "elo_tier": "easy"
+}

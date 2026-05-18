@@ -1,0 +1,37 @@
+Bootstrap: docker
+From: maven:3.9-eclipse-temurin-24
+
+%files
+    # /tmp is bind-mounted to the host during apptainer build and the
+    # bind-mount is dropped before %post runs; use /opt for a path that
+    # actually persists into the post step.
+    main_seed.py /opt/main_seed.py
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Etc/UTC
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Etc/UTC
+
+    apt-get update && apt-get install -y \
+        wget git build-essential ant unzip \
+        python3 python3-pip python3-venv \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \
+    && rm -rf /var/lib/apt/lists/*
+
+    git clone https://github.com/CodeClash-ai/RoboCode.git /workspace \
+    && cd /workspace \
+    && git remote set-url origin https://github.com/CodeClash-ai/RoboCode.git
+
+    # Seed a starter main.py so trace evaluation works from Round 0.
+    # Mirrors RoboCode.Dockerfile's: COPY main_seed.py /workspace/main.py
+    # (must run AFTER `git clone /workspace` so the clone doesn't fail on a
+    # non-empty target dir or clobber the seed.)
+    cp /opt/main_seed.py /workspace/main.py \
+    && rm /opt/main_seed.py
+
+%labels
+    Author CodeClash
