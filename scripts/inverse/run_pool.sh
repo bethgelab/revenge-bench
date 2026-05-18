@@ -7,36 +7,36 @@
 #   logs/{model}_{timestamp}/{arena}/target{hash}/seed{N}/
 #
 # Usage:
-#   bash run_pool.sh
+#   bash scripts/inverse/run_pool.sh
 #
 #   # Dry run:
-#   bash run_pool.sh --dry-run
+#   bash scripts/inverse/run_pool.sh --dry-run
 #
 #   # Resume (skip completed runs):
-#   bash run_pool.sh --resume
+#   bash scripts/inverse/run_pool.sh --resume
 #
 #   # Reuse a previous run's timestamp (so --resume hits the right output dir):
-#   bash run_pool.sh --timestamp 20260426_030536 --resume
+#   bash scripts/inverse/run_pool.sh --timestamp 20260426_030536 --resume
 #
 #   # Specific seeds:
-#   bash run_pool.sh --seeds "42 100"
+#   bash scripts/inverse/run_pool.sh --seeds "42 100"
 #
 #   # Specific configs only:
-#   bash run_pool.sh --configs "gpt52_halite deepseekv32_battlesnake"
+#   bash scripts/inverse/run_pool.sh --configs "gpt52_halite deepseekv32_battlesnake"
 #
 #   # Run with post-hoc pool evaluation after each target:
-#   bash run_pool.sh --pool-eval
+#   bash scripts/inverse/run_pool.sh --pool-eval
 #
 #   # Pool eval with custom sim count:
-#   bash run_pool.sh --pool-eval --pool-eval-sims 10
+#   bash scripts/inverse/run_pool.sh --pool-eval --pool-eval-sims 10
 #
 #   # Run a custom config directory:
-#   bash run_pool.sh --config-dir configs/inverse/pool
+#   bash scripts/inverse/run_pool.sh --config-dir configs/inverse/pool
 # ==========================================================================
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 PYTHON="$REPO_ROOT/.venv/bin/python"
@@ -103,7 +103,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --help|-h)
-            head -30 "$0" | grep '^#' | sed 's/^# \?//'
+            head -40 "$0" | grep '^#' | sed 's/^# \?//'
             exit 0
             ;;
         *)

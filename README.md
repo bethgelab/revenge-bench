@@ -40,8 +40,7 @@ revenge-bench/
 ├── scripts/                   # Runtime and evaluation entry points
 ├── tools/codeclash_strategies/ # Optional target-pool generation tooling
 ├── tests/
-├── main.py                    # Compatibility entry point
-└── run_pool.sh                # Main pool runner
+└── main.py                    # Compatibility entry point
 ```
 
 ## Installation
@@ -69,7 +68,7 @@ you plan to use.
 Main pool run:
 
 ```bash
-bash run_pool.sh --seeds "42"
+bash scripts/inverse/run_pool.sh --seeds "42"
 ```
 
 This iterates over `configs/inverse/pool/<model>/<model>_<game>.yaml`.

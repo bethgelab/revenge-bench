@@ -3,7 +3,7 @@
 
 Reads the strategy_pool section of a config YAML and applies the same
 target-selection logic as main.py (top_elo_targets → num_targets → all).
-Used by run_pool.sh to discover targets before launching parallel jobs,
+Used by scripts/inverse/run_pool.sh to discover targets before launching parallel jobs,
 so the bash script never needs to re-implement pool filtering logic.
 
 Usage:

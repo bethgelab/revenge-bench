@@ -1,7 +1,7 @@
 """Classify and (optionally) delete partially-completed tournament directories
 under a single pool-run log dir.
 
-Designed to chain with `run_pool.sh --timestamp <old> --resume` to retry only
+Designed to chain with `scripts/inverse/run_pool.sh --timestamp <old> --resume` to retry only
 the tournaments that crashed mid-run, without disturbing the ones that
 already finished.
 
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
                    help="Also delete dirs with permanent (context-length) errors.")
     p.add_argument("--include-unknown", action="store_true",
                    help="Also delete dirs whose log doesn't match a known error pattern. "
-                        "Useful when the failure trace was written to the run_pool.sh "
+                        "Useful when the failure trace was written to the scripts/inverse/run_pool.sh "
                         "per-target wrapper log instead of everything.log.")
     p.add_argument("--expected-rounds", type=int, default=None,
                    help="Override expected round count (default: modal across pool).")

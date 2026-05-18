@@ -2,7 +2,7 @@
 # Run the forward-PvP tournament across configured (challenger, game) pairs.
 # Iterates over configs/forward_pvp/{challenger}/{game}/*.yaml, dispatching each
 # YAML as one main.py invocation. Forward-PvP configs do not contain a
-# strategy_pool section, so they cannot be routed through run_pool.sh; this
+# strategy_pool section, so they cannot be routed through scripts/inverse/run_pool.sh; this
 # wrapper invokes main.py directly with bounded parallelism.
 #
 # Usage:

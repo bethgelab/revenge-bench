@@ -7,8 +7,8 @@
 #   - Global: kills ALL main.py processes if combined RSS exceeds TOTAL_MAX_GB
 #
 # Usage:
-#   nohup bash watchdog_oom.sh &>> logs/watchdog_oom.log &
-#   bash watchdog_oom.sh --per-proc 15 --total 180
+#   nohup bash scripts/watchdog_oom.sh &>> logs/watchdog_oom.log &
+#   bash scripts/watchdog_oom.sh --per-proc 15 --total 180
 # ==========================================================================
 
 set -uo pipefail
@@ -21,7 +21,7 @@ PATTERN="main.py"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)
-            echo "usage: watchdog_oom.sh [--per-proc GB] [--total GB] [--interval SEC] [--pattern REGEX]"
+            echo "usage: scripts/watchdog_oom.sh [--per-proc GB] [--total GB] [--interval SEC] [--pattern REGEX]"
             echo "  --per-proc GB   kill any single matching process exceeding this RSS (default: ${PER_PROC_MAX_GB})"
             echo "  --total GB      kill all matching processes if combined RSS exceeds this (default: ${TOTAL_MAX_GB})"
             echo "  --interval SEC  poll interval in seconds (default: ${INTERVAL})"
@@ -82,7 +82,7 @@ while true; do
         # Also kill any parent runner
         pkill -f "scripts/forward_pvp/run_forward_pvp.sh" 2>/dev/null
         pkill -f "scripts/inverse/run_" 2>/dev/null
-        pkill -f "run_pool.sh" 2>/dev/null
+        pkill -f "scripts/inverse/run_pool.sh" 2>/dev/null
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] All processes killed. Exiting watchdog."
         exit 1
     fi

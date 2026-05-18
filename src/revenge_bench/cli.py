@@ -79,7 +79,7 @@ def _log_base() -> Path:
 def _get_single_run_dir(config: dict, config_path: Path, timestamp: str, *, external_timestamp: bool) -> Path:
     """Build output dir for a single (non-pool) tournament run.
 
-    External timestamp (from run_pool.sh via -t): grouped run — top-level dir
+    External timestamp (from scripts/inverse/run_pool.sh via -t): grouped run — top-level dir
     uses the config's parent directory name so multiple configs share one parent,
     with config_stem as a sub-level below the arena.
 
@@ -489,7 +489,7 @@ def main_cli(argv: list[str] | None = None):
         "-t",
         "--timestamp",
         type=str,
-        help="Shared timestamp for grouping parallel runs (e.g. from run_pool.sh). Auto-generated if omitted.",
+        help="Shared timestamp for grouping parallel runs (e.g. from scripts/inverse/run_pool.sh). Auto-generated if omitted.",
         default=None,
     )
     parser.add_argument(

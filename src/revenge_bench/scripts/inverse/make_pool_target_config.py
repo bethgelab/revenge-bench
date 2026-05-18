@@ -1,10 +1,10 @@
 """Emit a per-target pool config from a base full-pool YAML.
 
 Replaces the brittle sed-based comment-marker substitution in
-``run_pool.sh``. Loads the base YAML (resolving ``!include`` directives
+``scripts/inverse/run_pool.sh``. Loads the base YAML (resolving ``!include`` directives
 the same way ``main.py`` does), mutates the structure to pin a single
 target + seed, and writes the result to the temp config path
-``run_pool.sh`` then hands to ``main.py``.
+``scripts/inverse/run_pool.sh`` then hands to ``main.py``.
 
 Mutations applied:
 - ``tournament.seed`` → the requested seed
