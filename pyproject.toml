@@ -46,7 +46,7 @@ aws = ["boto3"]
 
 [project.scripts]
 revenge-bench = "revenge_bench.cli:main_cli"
-revenge-bench-pool-eval = "revenge_bench.scripts.inverse.run_pool_eval:main"
+revenge-bench-pool-eval = "revenge_bench.scripts.run_pool_eval:main"
 
 [tool.uv.sources]
 codeclash = { path = "vendor/codeclash", editable = true }

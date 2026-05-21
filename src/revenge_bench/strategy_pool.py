@@ -91,7 +91,7 @@ class StrategyPool:
     Usage::
 
         # No filters — all strategies
-        pool = StrategyPool(Path("data/inverse/targets/battlesnake"), "BattleSnake")
+        pool = StrategyPool(Path("data/targets/battlesnake"), "BattleSnake")
 
         # Filter by Elo tier
         pool = StrategyPool(..., filters={"elo_tier": "hard"})

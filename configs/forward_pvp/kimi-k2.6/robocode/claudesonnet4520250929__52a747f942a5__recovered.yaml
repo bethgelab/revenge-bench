@@ -19,7 +19,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/robocode/claudesonnet4520250929__52a747f942a5
+    source_path: data/targets/robocode/claudesonnet4520250929__52a747f942a5
 - agent: mini
   name: challenger
   config:

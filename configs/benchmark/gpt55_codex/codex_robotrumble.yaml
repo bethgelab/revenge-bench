@@ -1,0 +1,63 @@
+# Full Pool Benchmark: RobotRumble — Codex CLI (gpt-5.4-mini)
+#
+# Mirrors gpt5_robotrumble.yaml's pool structure (top-15 ELO targets,
+# 5 rounds, interventionist with 5 probes/round) but uses the Codex
+# inverse-strategy adapter. Persistent context mode by default; set
+# `tournament.context_mode: reset` to compare against a no-memory run.
+
+name: codex_robotrumble_pool
+
+strategy_pool:
+  pool_dir: data/targets/robotrumble
+  opponent_pool_dir: data/targets/robotrumble
+  fixed_target: false
+  seed: 42
+  top_elo_targets: 15
+
+tournament:
+  rounds: 5
+  type: interventionist
+  max_probes_per_round: 5
+  sims_per_probe: 3
+  opponents_per_round: 20
+  context_mode: persistent
+
+game:
+  name: RobotRumble
+  sims_per_round: 20
+  args:
+    raw: true
+
+players:
+  - agent: inverse_codex
+    name: learner
+    editable: true
+    config:
+      agent:
+        <<: !include prompts/codex/system.yaml
+      codex:
+        command: codex
+        model: gpt-5.5
+        sandbox: danger-full-access
+        skip_git_repo_check: true
+        ephemeral: false
+        max_round_seconds: 600
+        config_overrides:
+          model_reasoning_effort: low
+          model_verbosity: low
+          tool_output_token_limit: 5000
+
+  - agent: static
+    name: target
+    editable: false
+    args:
+      source_path: data/targets/robotrumble  # overridden by pool
+
+  - agent: static
+    name: opponent
+    editable: false
+    args:
+      source_path: data/targets/robotrumble  # overridden per-round by pool
+
+prompts:
+  <<: !include prompts/codex/games/robotrumble.yaml

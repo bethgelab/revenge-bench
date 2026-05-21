@@ -31,14 +31,14 @@ revenge-bench/
 │   ├── traces/                # Per-arena trace parsers
 │   └── scripts/               # Importable pipeline utilities
 ├── configs/
-│   ├── inverse/pool/          # Main model x arena configs
-│   ├── inverse/conditions/    # Public optional conditions: no-probe, NL observation
-│   ├── inverse/baselines/     # Public baselines, including BPI
-│   ├── inverse/prompts/       # Runtime prompt templates
+│   ├── benchmark/             # Main model x arena configs
+│   ├── conditions/            # Public optional conditions: no-probe, NL observation
+│   ├── baselines/             # Public baselines, including BPI
+│   ├── prompts/               # Runtime prompt templates
 │   └── forward_pvp/           # Forward-PvP configs
-├── data/inverse/targets/      # Target policy pools
+├── data/targets/              # Target policy pools
 ├── scripts/                   # Runtime and evaluation entry points
-├── tools/codeclash_strategies/ # Optional target-pool generation tooling
+│   └── codeclash_strategies/  # Optional target-pool generation tooling
 ├── tests/
 └── main.py                    # Compatibility entry point
 ```
@@ -68,25 +68,25 @@ you plan to use.
 Main pool run:
 
 ```bash
-bash scripts/inverse/run_pool.sh --seeds "42"
+bash scripts/run_pool.sh --seeds "42"
 ```
 
-This iterates over `configs/inverse/pool/<model>/<model>_<game>.yaml`.
+This iterates over `configs/benchmark/<model>/<model>_<game>.yaml`.
 Useful runner flags include `--dry-run`, `--resume`, `--parallel N`,
 `--configs "name_a name_b"`, and `--config-dir <dir>`.
 
 Public optional conditions and baselines use the same runner:
 
 ```bash
-bash scripts/inverse/run_no_probe.sh --seeds "42"
-bash scripts/inverse/run_nl_observation.sh --seeds "42"
-bash scripts/inverse/run_bpi.sh --seeds "42"
+bash scripts/run_no_probe.sh --seeds "42"
+bash scripts/run_nl_observation.sh --seeds "42"
+bash scripts/run_bpi.sh --seeds "42"
 ```
 
 Forward-PvP runs use the curated configs under `configs/forward_pvp/`:
 
 ```bash
-bash scripts/forward_pvp/run_forward_pvp.sh \
+bash scripts/run_forward_pvp.sh \
     --challengers "gpt5 gpt5-mini gpt-oss-120b grok-4.1-fast kimi-k2.6 deepseek-v3.2"
 ```
 
@@ -95,9 +95,9 @@ bash scripts/forward_pvp/run_forward_pvp.sh \
 The main benchmark condition is active inverse-strategy recovery with probes.
 The public release also includes:
 
-- `configs/inverse/conditions/no_probe/`: trace-only recovery with active probes disabled.
-- `configs/inverse/conditions/nl_observation/`: recovery from LLM-generated natural-language summaries of traces.
-- `configs/inverse/baselines/bpi/`: Bayesian Program Inference baseline configs.
+- `configs/conditions/no_probe/`: trace-only recovery with active probes disabled.
+- `configs/conditions/nl_observation/`: recovery from LLM-generated natural-language summaries of traces.
+- `configs/baselines/bpi/`: Bayesian Program Inference baseline configs.
 - `configs/forward_pvp/`: downstream PvP configs comparing blind, recovered, and oracle opponent intelligence.
 
 Paper-only plotting, history-compaction sweeps, reset-memory sweeps, and probe
@@ -105,16 +105,16 @@ prompt ablation suites are intentionally not part of this release package.
 
 ## Adding Target Policies
 
-Create a directory under `data/inverse/targets/<arena>/<policy_name>/` with a
+Create a directory under `data/targets/<arena>/<policy_name>/` with a
 `main.py` implementing the arena's player API. See the existing target pools
 for examples.
 
 Optional CodeClash target-pool generation helpers live under
-`tools/codeclash_strategies/`. They can download CodeClash viewer artifacts,
+`scripts/codeclash_strategies/`. They can download CodeClash viewer artifacts,
 extract runnable strategies, validate them, and run Elo selection:
 
 ```bash
-bash tools/codeclash_strategies/build_pool.sh --game BattleSnake --count 40
+bash scripts/codeclash_strategies/build_pool.sh --game BattleSnake --count 40
 ```
 
 ## Relationship To CodeClash

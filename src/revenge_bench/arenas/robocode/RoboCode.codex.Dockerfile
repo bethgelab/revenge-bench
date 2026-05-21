@@ -18,8 +18,8 @@ RUN apt-get update \
 RUN npm install -g @openai/codex@latest \
  && codex --version
 
-COPY scripts/codex/inverse-codex-exec.sh /usr/local/bin/inverse-codex-exec
-RUN chmod +x /usr/local/bin/inverse-codex-exec
+COPY scripts/codex_exec.sh /usr/local/bin/revenge-codex-exec
+RUN chmod +x /usr/local/bin/revenge-codex-exec
 
 RUN mkdir -p /codex_home
 

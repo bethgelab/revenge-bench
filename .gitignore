@@ -15,7 +15,7 @@ data/extracted_strategies/
 data/codeclash_html/
 data/codeclash_strategies/
 *.jsonl
-!data/inverse/test_fixtures/**/*.jsonl
+!data/test_fixtures/**/*.jsonl
 
 # Empty placeholder dirs (content untracked, regenerated)
 logs/**
@@ -258,14 +258,14 @@ plotting/huskybench/data/
 # Generated plots — regenerated from scripts + provenance, not versioned
 plotting/**/*.png
 
-# Inverse Strategy - large extracted strategies folder
-data/inverse/extracted_strategies/
-data/inverse/codeclash_index.html
-data/inverse/codeclash_html/
-data/inverse/targets_v0
-data/inverse/targets/*_pre_fix/
-data/inverse/targets_selected/
-data/inverse/targets_longctx/
+# Generated CodeClash strategy-pool artifacts
+data/extracted_strategies/
+data/codeclash_index.html
+data/codeclash_html/
+data/targets_v0
+data/targets/*_pre_fix/
+data/targets_selected/
+data/targets_longctx/
 *.class
 
 # macOS

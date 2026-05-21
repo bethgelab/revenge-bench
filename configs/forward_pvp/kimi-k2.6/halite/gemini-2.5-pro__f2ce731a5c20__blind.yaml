@@ -16,7 +16,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/halite/gemini-2.5-pro__f2ce731a5c20
+    source_path: data/targets/halite/gemini-2.5-pro__f2ce731a5c20
 - agent: mini
   name: challenger
   config:

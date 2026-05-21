@@ -15,7 +15,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/robotrumble/qwen3-coder-plus-2025-09-23__8bcfd6d26453
+    source_path: data/targets/robotrumble/qwen3-coder-plus-2025-09-23__8bcfd6d26453
 - agent: mini
   name: challenger
   config:

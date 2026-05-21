@@ -79,7 +79,7 @@ def _log_base() -> Path:
 def _get_single_run_dir(config: dict, config_path: Path, timestamp: str, *, external_timestamp: bool) -> Path:
     """Build output dir for a single (non-pool) tournament run.
 
-    External timestamp (from scripts/inverse/run_pool.sh via -t): grouped run — top-level dir
+    External timestamp (from scripts/run_pool.sh via -t): grouped run — top-level dir
     uses the config's parent directory name so multiple configs share one parent,
     with config_stem as a sub-level below the arena.
 
@@ -218,7 +218,7 @@ def _run_pool_eval(tournament_dir: Path, pool_dir: Path, *, sims: int, rounds: s
         logger.info(f"  Pool eval already complete, skipping: {tournament_dir.name}")
         return
     try:
-        from revenge_bench.scripts.inverse.run_pool_eval import run as pool_eval_run
+        from revenge_bench.scripts.run_pool_eval import run as pool_eval_run
 
         logger.info(f"  Running pool eval: {tournament_dir.name} vs {pool_dir} (sims={sims}, rounds={rounds})")
         pool_eval_run(tournament_dir, pool_dir, sims_per_opponent=sims, rounds=rounds)
@@ -489,7 +489,7 @@ def main_cli(argv: list[str] | None = None):
         "-t",
         "--timestamp",
         type=str,
-        help="Shared timestamp for grouping parallel runs (e.g. from scripts/inverse/run_pool.sh). Auto-generated if omitted.",
+        help="Shared timestamp for grouping parallel runs (e.g. from scripts/run_pool.sh). Auto-generated if omitted.",
         default=None,
     )
     parser.add_argument(

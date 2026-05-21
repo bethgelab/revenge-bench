@@ -1,0 +1,63 @@
+# NL Observation Condition (Desc-Only / CSRO): Halite — Gemma 4 31B
+
+name: gemma_4_31b_nl_observation
+
+strategy_pool:
+  pool_dir: data/targets/halite
+  opponent_pool_dir: data/targets/halite
+  fixed_target: false
+  seed: 42
+  top_elo_targets: 15
+
+tournament:
+  rounds: 5
+  type: interventionist
+  max_probes_per_round: 0
+  sims_per_probe: 3
+  opponents_per_round: 20
+  observation_mode: nl_summary
+  summarizer_model:
+    model_name: openrouter/openai/gpt-5.4-mini
+
+game:
+  name: Halite
+  sims_per_round: 20
+  args: {}
+
+players:
+  - agent: inverse
+    name: learner
+    editable: true
+    config:
+      agent:
+        <<: !include prompts/system/interventionist_nl_observation.yaml
+        step_limit: 30
+        cost_limit: 1.0
+        max_output_chars: 3000
+        keep_recent_observations: 8
+        max_past_output_chars: 500
+        max_context_chars: 100000
+      model:
+        model_name: openrouter/google/gemma-4-31b-it
+        cost_tracking: ignore_errors
+        model_kwargs:
+          timeout: 300
+          num_retries: 3
+          extra_body:
+            provider:
+              order: ["Venice", "Parasail", "DeepInfra", "Chutes"]
+              allow_fallbacks: true
+  - agent: static
+    name: target
+    editable: false
+    args:
+      source_path: data/targets/halite
+
+  - agent: static
+    name: opponent
+    editable: false
+    args:
+      source_path: data/targets/halite
+
+prompts:
+  <<: !include prompts/game/nl_observation/halite.yaml

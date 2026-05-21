@@ -15,7 +15,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/halite/gpt5__c98b51a24f8c
+    source_path: data/targets/halite/gpt5__c98b51a24f8c
 - agent: mini
   name: challenger
   config:

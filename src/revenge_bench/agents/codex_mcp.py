@@ -10,7 +10,7 @@ Exposed tools (intentionally narrow):
 
 - ``submit()``: write the submit marker into the learner container,
   signalling the round is intentionally complete. The image-baked
-  watchdog (`inverse-codex-exec`) sees the marker and gracefully
+  watchdog (`revenge-codex-exec`) sees the marker and gracefully
   terminates Codex.
 - ``run_probe()``: delegate to the tournament's probe callback (which
   is the existing ``_run_inline_probe`` method on
@@ -54,7 +54,7 @@ from revenge_bench.utils.log import get_logger
 
 # Marker path inside the learner container — kept identical to the
 # constant in `codex_agent.py` so the two modules stay in sync.
-SUBMIT_MARKER_PATH = "/workspace/.inverse_strategy/submitted.json"
+SUBMIT_MARKER_PATH = "/workspace/.revenge_bench/submitted.json"
 
 # Type alias for the tournament's probe callback. The existing
 # `_run_inline_probe` returns a string (typically JSON); we wrap it.
@@ -149,7 +149,7 @@ class CodexMCPServer:
             "probe_callback": None,
         }
 
-        self._mcp = FastMCP("inverse-codex", host=host, port=self._port)
+        self._mcp = FastMCP("revenge-codex", host=host, port=self._port)
         self._register_tools()
 
         self._uvicorn_server: uvicorn.Server | None = None
@@ -209,7 +209,7 @@ class CodexMCPServer:
         app.add_middleware(_BearerAuthMiddleware, token=self._token)
 
         async def healthz(request):
-            return JSONResponse({"ok": True, "service": "inverse-codex-mcp"})
+            return JSONResponse({"ok": True, "service": "revenge-codex-mcp"})
 
         app.add_route("/healthz", healthz, methods=["GET"])
 

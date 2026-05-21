@@ -16,7 +16,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/battlesnake/grok-code-fast-1__e2d9c3c435ba
+    source_path: data/targets/battlesnake/grok-code-fast-1__e2d9c3c435ba
 - agent: mini
   name: challenger
   config:

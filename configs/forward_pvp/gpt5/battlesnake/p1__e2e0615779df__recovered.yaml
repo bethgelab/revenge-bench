@@ -15,7 +15,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/battlesnake/p1__e2e0615779df
+    source_path: data/targets/battlesnake/p1__e2e0615779df
 - agent: mini
   name: challenger
   config:

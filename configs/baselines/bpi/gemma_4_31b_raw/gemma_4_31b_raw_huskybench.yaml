@@ -1,0 +1,75 @@
+# Bayesian Program Inference (BPI / ROTE) — raw mode: HuskyBench — Gemma 4 31B
+#
+# sims_per_round=400 matches the gpt5_raw HuskyBench baseline.
+# HuskyBench (poker) needs more sims-per-round for low-variance action-
+# distance estimates than the other (more deterministic) games.
+
+name: gemma_4_31b_raw_bayesian_inference
+
+strategy_pool:
+  pool_dir: data/targets/huskybench
+  opponent_pool_dir: data/targets/huskybench
+  fixed_target: false
+  seed: 42
+  top_elo_targets: 15
+
+tournament:
+  type: bayesian_program_inference
+  rounds: 1
+  num_candidates: 5
+  beta: 10.0
+  alpha: 0.01
+  diversity:
+    bootstrap_observations: true
+    diverse_prompts:
+      - "Focus on the simplest possible rules: what does the target ALWAYS do regardless of game state? Implement the minimal set of if-then rules that cover the most common cases."
+      - "Focus on spatial/positional reasoning: how does the target use distance, direction, and relative position to make decisions? Look for geometric patterns."
+      - "Focus on state-dependent branching: identify distinct modes the target operates in (offensive/defensive/neutral) and what triggers transitions between them."
+      - "Focus on opponent-reactive behavior: how does the target respond to what the opponent is doing? Look for chase/flee/mirror patterns that depend on opponent state."
+      - "Focus on resource/value optimization: what does the target prioritize collecting or maximizing? Look for greedy heuristics, scoring functions, and utility-based decisions."
+  opponents_per_round: 20
+  observation_mode: raw
+
+game:
+  name: HuskyBench
+  sims_per_round: 400
+  args:
+    browser: false
+
+players:
+  - agent: inverse
+    name: learner
+    editable: true
+    config:
+      agent:
+        <<: !include prompts/system/interventionist.yaml
+        step_limit: 30
+        cost_limit: 1.0
+        max_output_chars: 3000
+        keep_recent_observations: 8
+        max_past_output_chars: 500
+        max_context_chars: 100000
+      model:
+        model_name: openrouter/google/gemma-4-31b-it
+        cost_tracking: ignore_errors
+        model_kwargs:
+          timeout: 300
+          num_retries: 3
+          extra_body:
+            provider:
+              order: ["Venice", "Parasail", "DeepInfra", "Chutes"]
+              allow_fallbacks: true
+  - agent: static
+    name: target
+    editable: false
+    args:
+      source_path: data/targets/huskybench
+
+  - agent: static
+    name: opponent
+    editable: false
+    args:
+      source_path: data/targets/huskybench
+
+prompts:
+  <<: !include prompts/game/no_probe/huskybench.yaml

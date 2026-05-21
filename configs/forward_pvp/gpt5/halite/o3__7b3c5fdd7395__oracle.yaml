@@ -15,7 +15,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/halite/o3__7b3c5fdd7395
+    source_path: data/targets/halite/o3__7b3c5fdd7395
 - agent: mini
   name: challenger
   config:

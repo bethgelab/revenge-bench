@@ -1,0 +1,33 @@
+# BattleSnake Static vs Static Tournament
+#
+# Both agents are static (pre-written code).
+# Useful for testing arena, trace parsing, and distance computation
+# without requiring LLM calls.
+#
+# Note: This is a 2-player setup since there's no learner.
+
+tournament:
+  rounds: 1
+
+game:
+  name: BattleSnake
+  sims_per_round: 10
+  args:
+    width: 11
+    height: 11
+    browser: false
+
+players:
+  - agent: static
+    name: player1
+    editable: false
+    args:
+      source_path: data/targets/greedy_food
+
+  - agent: static
+    name: player2
+    editable: false
+    args:
+      source_path: data/targets/greedy_food
+
+prompts: {}

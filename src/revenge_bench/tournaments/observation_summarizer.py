@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Config loading ───────────────────────────────────────────────────────────
 
-_CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "inverse" / "prompts" / "summarizer"
+_CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "prompts" / "summarizer"
 _DEFAULT_CONFIG = _CONFIG_DIR / "default.yaml"
 
 
@@ -64,7 +64,7 @@ def generate_nl_observation(
         model_name: LLM model for summarization.
         model_kwargs: Additional kwargs for litellm (api_base, api_key, etc.)
         config_path: Optional path to summarizer YAML config. Defaults to
-            configs/inverse/prompts/summarizer/default.yaml.
+            configs/prompts/summarizer/default.yaml.
 
     Returns:
         Natural language summary string.

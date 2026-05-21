@@ -15,7 +15,7 @@ players:
   name: target
   editable: false
   args:
-    source_path: data/inverse/targets/robotrumble/cs4-20250514__d06de577a885
+    source_path: data/targets/robotrumble/cs4-20250514__d06de577a885
 - agent: mini
   name: challenger
   config:

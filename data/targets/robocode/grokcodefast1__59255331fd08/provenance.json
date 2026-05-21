@@ -1,0 +1,28 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RoboCode",
+  "model": "grokcodefast1",
+  "tournament": "PvpTournament.RoboCode.r15.s250.p2.gemini25pro.grokcodefast1.251010034845",
+  "source_path": "data/extracted_strategies/RoboCode/PvpTournament.RoboCode.r15.s250.p2.gemini25pro.grokcodefast1.251010034845/final/grokcodefast1",
+  "lines": 118,
+  "content_hash": "59255331fd08",
+  "complexity_score": 71,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 71,
+    "loc": 118,
+    "branch_count": 9,
+    "method_count": 31,
+    "event_handler_count": 3,
+    "strategy_score": 2,
+    "strategies_found": [
+      "predictive"
+    ]
+  },
+  "elo": 1468.1,
+  "elo_rank": 34,
+  "elo_total": 40,
+  "elo_win_rate": 0.4,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}
