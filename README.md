@@ -1,6 +1,34 @@
-# RevengeBench
+<p align="center">
+  <img src="assets/logo.png" alt="RevengeBench Logo" width="160"/>
+</p>
 
-Reverse-engineering code-space policies from behavioral experiments.
+<h1 align="center">RevengeBench</h1>
+
+<h3 align="center">Reverse Engineering Code-Space Policies from Behavioral Experiments</h3>
+
+<p align="center">
+  <strong>Babak Rahmani*</strong> &nbsp;&middot;&nbsp;
+  <strong>Sebastian Dziadzio*</strong> &nbsp;&middot;&nbsp;
+  <strong>Joschka Strüber*</strong> &nbsp;&middot;&nbsp;
+  <strong>Sergio Hernández-Gutiérrez</strong> &nbsp;&middot;&nbsp;
+  <strong>Matthias Bethge</strong>
+</p>
+
+<p align="center">
+  Tübingen AI Center
+</p>
+
+<p align="center">
+  (*) Equal contribution.
+</p>
+
+<p align="center">
+  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img src="https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg?logo=arXiv" alt="arXiv"></a>
+  <a href="https://huggingface.co/datasets/bethgelab/revengebench"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-yellow" alt="Dataset"></a>
+  <a href="https://revengebench.com/#leaderboard"><img src="https://img.shields.io/badge/Website-Leaderboard-orange.svg?logo=googlechrome" alt="Leaderboard"></a>
+</p>
+
+---
 
 RevengeBench poses an inverse problem in code-space: given only behavioral
 traces of an opaque target agent acting in a programming-game arena, can a
@@ -127,7 +155,14 @@ upstream tree.
 
 ## Citation
 
-{Placeholder}
+```bibtex
+@article{rahmani2026revengebench,
+  title={RevengeBench: Reverse Engineering Code-Space Policies from Behavioral Experiments},
+  author={Rahmani, Babak and Dziadzio, Sebastian and Str{\"u}ber, Joschka and Hern{\'a}ndez-Guti{\'e}rrez, Sergio and Bethge, Matthias},
+  journal={arXiv preprint arXiv:XXXX.XXXXX},
+  year={2026}
+}
+```
 
 ## License
 
