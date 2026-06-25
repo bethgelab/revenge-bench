@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img src="https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg?logo=arXiv" alt="arXiv"></a>
+  <a href="https://arxiv.org/abs/2606.26094"><img src="https://img.shields.io/badge/arXiv-2606.26094-b31b1b.svg?logo=arXiv" alt="arXiv"></a>
   <a href="https://huggingface.co/datasets/bethgelab/revengebench"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-yellow" alt="Dataset"></a>
   <a href="https://revengebench.com/#leaderboard"><img src="https://img.shields.io/badge/Website-Leaderboard-orange.svg?logo=googlechrome" alt="Leaderboard"></a>
 </p>
@@ -159,7 +159,7 @@ upstream tree.
 @article{rahmani2026revengebench,
   title={RevengeBench: Reverse Engineering Code-Space Policies from Behavioral Experiments},
   author={Rahmani, Babak and Dziadzio, Sebastian and Str{\"u}ber, Joschka and Hern{\'a}ndez-Guti{\'e}rrez, Sergio and Bethge, Matthias},
-  journal={arXiv preprint arXiv:XXXX.XXXXX},
+  journal={arXiv preprint arXiv:2606.26094},
   year={2026}
 }
 ```
