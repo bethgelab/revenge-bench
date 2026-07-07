@@ -538,6 +538,83 @@ def extract_state_action_pairs(
     return pairs
 
 
+def build_probe_trace_payload(
+    simulations: list[tuple[str, dict]],
+    probe_id: int,
+) -> dict[str, Any]:
+    """Build the HuskyBench probe JSON payload from parsed game logs.
+
+    Mirrors the normal interventionist probe parser. Poker is sequential, so
+    each pair represents one player's decision with the reconstructed state at
+    that point. The caller is responsible for ensuring ``playerNames`` has been
+    rewritten to stable names such as ``probe`` and ``target``.
+    """
+    all_pairs: list[dict[str, Any]] = []
+    per_simulation: list[dict[str, Any]] = []
+
+    for hand_idx, (name, hand_data) in enumerate(simulations):
+        player_names = hand_data.get("playerNames", {})
+        rounds_data = hand_data.get("rounds", {})
+        hand_pairs: list[dict[str, Any]] = []
+
+        for round_key in sorted(rounds_data.keys(), key=int):
+            round_idx = int(round_key)
+            round_data = rounds_data[round_key]
+            action_sequence = round_data.get("action_sequence", [])
+
+            for action_idx, seq_action in enumerate(action_sequence):
+                acting_pid = str(seq_action.get("player", ""))
+                acting_name = player_names.get(acting_pid, f"player{acting_pid}")
+
+                state = _reconstruct_state_at_action(
+                    hand_data=hand_data,
+                    action_idx=action_idx,
+                    round_idx=round_idx,
+                    player_id=acting_pid,
+                    player_name=acting_name,
+                    hand_number=hand_idx,
+                )
+
+                raw_action = seq_action.get("action", "")
+                amount = seq_action.get("amount", 0)
+                my_stack = state["my_stack"]
+
+                if raw_action.upper() == "RAISE":
+                    action = normalize_action(
+                        {"action": raw_action, "amount": amount},
+                        player_stack=my_stack,
+                    )
+                else:
+                    action = normalize_action(raw_action)
+
+                hand_pairs.append(
+                    {
+                        "hand": hand_idx,
+                        "round": ROUND_NAMES.get(round_idx, f"round_{round_idx}"),
+                        "player": acting_name,
+                        "action": action,
+                        "state": state,
+                    }
+                )
+
+        all_pairs.extend(hand_pairs)
+        per_simulation.append(
+            {
+                "file": name,
+                "num_actions": len(hand_pairs),
+            }
+        )
+
+    return {
+        "probe_id": probe_id,
+        "description": "probe vs target poker hands — each entry is one player's decision with full game state",
+        "total_turns": len(all_pairs),
+        "num_simulations": len(per_simulation),
+        "per_simulation": per_simulation,
+        "pairs": all_pairs,
+    }
+
+
 # =============================================================================
 # Trace Parser
 # =============================================================================

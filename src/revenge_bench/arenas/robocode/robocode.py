@@ -13,6 +13,7 @@ from tqdm.auto import tqdm
 from revenge_bench.agents.player import Player
 from revenge_bench.arenas.arena import CodeArena, RoundStats
 from revenge_bench.constants import RESULT_TIE
+from revenge_bench.traces.robocode_probe import robocode_round_battle_content
 from revenge_bench.utils.environment import create_file_in_container
 
 RC_FILE = Path("MyTank.java")
@@ -141,10 +142,12 @@ Keep the main bot class named `{str(RC_FILE)}`, but you can include additional J
         selected_robots = ",".join([f"{pkg}.{RC_FILE.stem}*" for pkg in self._pkg_to_agent])
         battle_file = f"{self.game_id}-battle{int(time.time())}.battle"
         num_sims = self.game_config.get("sims_per_round", 1)
-        battle_content = f"""#Battle Properties
-{self._get_battle_config(num_rounds=1)}
-robocode.battle.selectedRobots={selected_robots}
-"""
+        battle_content = robocode_round_battle_content(
+            list(self._pkg_to_agent),
+            robot_class=RC_FILE.stem,
+            battle_config=self._get_battle_config(num_rounds=1),
+        )
+        assert f"robocode.battle.selectedRobots={selected_robots}" in battle_content
         create_file_in_container(self.environment, content=battle_content, dest_path=f"battles/{battle_file}")
 
         # Run one engine invocation per sim, each producing its own file

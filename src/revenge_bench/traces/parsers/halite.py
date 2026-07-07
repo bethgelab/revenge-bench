@@ -303,6 +303,86 @@ def extract_state_action_pairs(
     return pairs
 
 
+def extract_probe_state_action_pairs(
+    data: dict,
+    *,
+    probe_tag: int = 1,
+    target_tag: int = 2,
+) -> list[dict[str, Any]]:
+    """Extract probe-vs-target pairs from a Halite probe replay.
+
+    Halite bots self-identify in replay metadata, so probe parsing uses argv
+    order instead of bot names: the probe is player tag 1 and the target is
+    player tag 2 in the normal interventionist probe and Harbor ``run_probe``.
+    """
+    player_names = data.get("player_names", [])
+    if len(player_names) < max(probe_tag, target_tag):
+        return []
+
+    frames = data.get("frames", [])
+    moves = data.get("moves", [])
+    height = data.get("height", 0)
+    width = data.get("width", 0)
+
+    pairs: list[dict[str, Any]] = []
+    for turn_idx, move_grid in enumerate(moves):
+        frame = frames[turn_idx]
+        probe_action = []
+        target_action = []
+        for r in range(height):
+            for c in range(width):
+                owner = frame[r][c][0]
+                move = move_grid[r][c]
+                if owner == probe_tag:
+                    probe_action.append([r, c, move])
+                elif owner == target_tag:
+                    target_action.append([r, c, move])
+
+        probe_action.sort()
+        target_action.sort()
+        pairs.append(
+            {
+                "turn": turn_idx,
+                "probe_action": probe_action,
+                "target_action": target_action,
+                "distance": actions_distance(probe_action, target_action),
+                "target_state": extract_player_state(
+                    frame, turn_idx, target_tag, data
+                ),
+            }
+        )
+
+    return pairs
+
+
+def build_probe_trace_payload(
+    replays: list[tuple[str, dict]],
+    probe_id: int,
+    *,
+    probe_tag: int = 1,
+    target_tag: int = 2,
+) -> dict[str, Any]:
+    """Build the Halite probe trace payload from decoded replay data."""
+    all_pairs: list[dict[str, Any]] = []
+    per_simulation: list[dict[str, Any]] = []
+
+    for file_name, data in replays:
+        sim_pairs = extract_probe_state_action_pairs(
+            data, probe_tag=probe_tag, target_tag=target_tag
+        )
+        all_pairs.extend(sim_pairs)
+        per_simulation.append({"file": file_name, "num_turns": len(sim_pairs)})
+
+    return {
+        "probe_id": probe_id,
+        "description": "probe vs target - showing what each did in same state",
+        "total_turns": len(all_pairs),
+        "num_simulations": len(per_simulation),
+        "per_simulation": per_simulation,
+        "pairs": all_pairs,
+    }
+
+
 # =============================================================================
 # Trace Parser
 # =============================================================================

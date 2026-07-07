@@ -652,25 +652,19 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
         target = Red.
         """
         try:
-            from revenge_bench.traces.parsers.robotrumble import (
-                actions_distance,
-                extract_player_action,
-                extract_player_state,
-            )
+            from revenge_bench.traces.parsers.robotrumble import build_probe_trace_payload
         except ImportError as e:
             return {
                 "error": f"RobotRumble parser not available: {e}",
                 "probe_id": probe_id,
             }
 
-        all_pairs: list[dict[str, Any]] = []
-        per_simulation: list[dict[str, Any]] = []
-
         ls_result = arena.environment.execute("ls /logs/sim_*.json 2>/dev/null || echo 'NONE'")
         if "NONE" in ls_result.get("output", ""):
             return {"error": "No simulation files found", "probe_id": probe_id}
 
         sim_files = [f.strip() for f in ls_result["output"].strip().split("\n") if f.strip()]
+        simulations: list[tuple[str, dict[str, Any]]] = []
 
         for sim_file in sim_files:
             cat_result = arena.environment.execute(f"cat {sim_file}")
@@ -681,50 +675,9 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
                 data = json.loads(cat_result["output"])
             except json.JSONDecodeError:
                 continue
+            simulations.append((sim_file.split("/")[-1], data))
 
-            turns = data.get("turns", [])
-            sim_pairs = []
-
-            for turn_data in turns:
-                turn_num = turn_data.get("turn", 0)
-
-                # Extract states and actions for both teams
-                target_state = extract_player_state(turn_data, "Red")
-                probe_state = extract_player_state(turn_data, "Blue")
-                if target_state is None or probe_state is None:
-                    continue
-
-                target_action = extract_player_action(turn_data, "Red")
-                probe_action = extract_player_action(turn_data, "Blue")
-                if target_action is None or probe_action is None:
-                    continue
-
-                distance = actions_distance(probe_action, target_action)
-                pair = {
-                    "turn": turn_num,
-                    "probe_action": probe_action,
-                    "target_action": target_action,
-                    "distance": distance,
-                    "target_state": target_state,
-                }
-                sim_pairs.append(pair)
-                all_pairs.append(pair)
-
-            per_simulation.append(
-                {
-                    "file": sim_file.split("/")[-1],
-                    "num_turns": len(sim_pairs),
-                }
-            )
-
-        return {
-            "probe_id": probe_id,
-            "description": "probe (Blue) vs target (Red) - showing what each did in same state",
-            "total_turns": len(all_pairs),
-            "num_simulations": len(per_simulation),
-            "per_simulation": per_simulation,
-            "pairs": all_pairs,
-        }
+        return build_probe_trace_payload(simulations, probe_id)
 
     # -- RoboCode -------------------------------------------------------------
 
@@ -741,7 +694,10 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
         Returns:
             The probe source code (``probe/MyTank.java`` content).
         """
-        from revenge_bench.arenas.robocode.robocode import RC_FILE
+        from revenge_bench.traces.robocode_probe import (
+            RC_FILE,
+            probe_battle_content,
+        )
 
         # Read probe code for metadata
         probe_main = f"/workspace/probe/{RC_FILE}"
@@ -775,18 +731,8 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
             if result.get("returncode", 0) != 0:
                 raise RuntimeError(f"Compilation failed for {pkg}: {result.get('output', '')}")
 
-        # Run sims_per_probe separate games (1 round each), like other games
-        selected = f"p0.{RC_FILE.stem}*,p1.{RC_FILE.stem}*"
-        battle_content = (
-            "#Battle Properties\n"
-            "robocode.battle.numRounds=1\n"
-            "robocode.battle.gunCoolingRate=0.1\n"
-            "robocode.battle.rules.inactivityTime=450\n"
-            "robocode.battle.rules.hideEnemyNames=True\n"
-            "robocode.battleField.width=800\n"
-            "robocode.battleField.height=600\n"
-            f"robocode.battle.selectedRobots={selected}\n"
-        )
+        arena.environment.execute("rm -f robots/robot.database")
+        battle_content = probe_battle_content(robot_class=RC_FILE.stem)
         create_file_in_container(arena.environment, content=battle_content, dest_path="battles/probe.battle")
 
         for i in range(self.sims_per_probe):
@@ -811,10 +757,8 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
         Player order: probe = p0, target = p1.
         """
         try:
-            from revenge_bench.traces.parsers.robocode import (
-                actions_distance,
-                extract_state_action_pairs,
-            )
+            from revenge_bench.traces.robocode_probe import build_checked_probe_payload
+            from revenge_bench.traces.parsers.robocode import build_probe_trace_payload
         except ImportError as e:
             return {
                 "error": f"RoboCode parser not available: {e}",
@@ -822,9 +766,6 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
             }
 
         import tempfile
-
-        all_pairs: list[dict[str, Any]] = []
-        per_simulation: list[dict[str, Any]] = []
 
         # List XML recording files
         ls_result = arena.environment.execute("ls /logs/record_*.xml 2>/dev/null || echo 'NONE'")
@@ -841,10 +782,12 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
 
         sim_files = [f.strip() for f in ls_result["output"].strip().split("\n") if f.strip()]
 
-        for sim_file in sim_files:
-            # Copy XML to host for parsing (too large for cat)
-            with tempfile.TemporaryDirectory() as tmp:
-                local_xml = Path(tmp) / "record.xml"
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            simulations: list[tuple[str, Path]] = []
+            for sim_file in sim_files:
+                # Copy XML to host for parsing (too large for cat)
+                local_xml = tmp_path / sim_file.split("/")[-1]
                 copy_from_container(arena.environment, sim_file, str(local_xml))
 
                 if not local_xml.exists():
@@ -856,55 +799,32 @@ class InverseStrategyInterventionistTournament(InverseStrategyTournament):
                     self.logger.warning(f"Probe {probe_id}: {sim_file} copied as empty file")
                     continue
 
-                sim_pairs = []
-
-                # Extract pairs for both probe (p0) and target (p1)
                 try:
-                    target_pairs = extract_state_action_pairs(local_xml, "p1")
-                    probe_pairs = extract_state_action_pairs(local_xml, "p0")
+                    if not build_probe_trace_payload([(sim_file.split("/")[-1], local_xml)], probe_id).get("pairs"):
+                        self.logger.warning(
+                            f"Probe {probe_id}: {sim_file} parsed but 0 aligned pairs ({file_size} bytes)"
+                        )
                 except Exception as e:
-                    self.logger.warning(f"Error parsing {sim_file}: {e}")
+                    self.logger.warning(
+                        f"Error parsing {sim_file}: {e}"
+                    )
                     continue
 
-                if not target_pairs and not probe_pairs:
-                    self.logger.warning(
-                        f"Probe {probe_id}: {sim_file} parsed but 0 pairs for both p0 and p1 ({file_size} bytes)"
-                    )
+                simulations.append((local_xml.name, local_xml))
 
-                # Align by turn — both lists should have pairs for the same turns
-                target_by_tick = {s.get("tick", i): (s, a) for i, (s, a) in enumerate(target_pairs)}
-                probe_by_tick = {s.get("tick", i): (s, a) for i, (s, a) in enumerate(probe_pairs)}
-
-                for tick in sorted(set(target_by_tick) & set(probe_by_tick)):
-                    target_state, target_action = target_by_tick[tick]
-                    _, probe_action = probe_by_tick[tick]
-
-                    distance = actions_distance(probe_action, target_action)
-                    pair = {
-                        "turn": tick,
-                        "probe_action": probe_action,
-                        "target_action": target_action,
-                        "distance": round(distance, 4),
-                        "target_state": target_state,
-                    }
-                    sim_pairs.append(pair)
-                    all_pairs.append(pair)
-
-                per_simulation.append(
-                    {
-                        "file": sim_file.split("/")[-1],
-                        "num_turns": len(sim_pairs),
-                    }
-                )
-
-        return {
-            "probe_id": probe_id,
-            "description": "probe (p0) vs target (p1) — action comparison per tick",
-            "total_turns": len(all_pairs),
-            "num_simulations": len(per_simulation),
-            "per_simulation": per_simulation,
-            "pairs": all_pairs,
-        }
+            try:
+                return build_checked_probe_payload(simulations, probe_id)
+            except RuntimeError as e:
+                self.logger.warning(f"Probe {probe_id}: {e}")
+                return {
+                    "error": str(e),
+                    "probe_id": probe_id,
+                    "description": "probe (p0) vs target (p1) — action comparison per tick",
+                    "total_turns": 0,
+                    "num_simulations": len(simulations),
+                    "per_simulation": [{"file": name, "num_turns": 0} for name, _ in simulations],
+                    "pairs": [],
+                }
 
     # -- Helpers for compiled-language arenas ----------------------------------
 
@@ -1135,15 +1055,9 @@ IMPORTANT: This file may exceed your context window. Use commands to explore:
     def _parse_halite_probe_traces(self, arena: CodeArena, probe_id: int) -> dict[str, Any]:
         """Parse probe traces from Halite .hlt replay files."""
         try:
-            from revenge_bench.traces.parsers.halite import (
-                actions_distance,
-                extract_player_state,
-            )
+            from revenge_bench.traces.parsers.halite import build_probe_trace_payload
         except ImportError as e:
             return {"error": f"Halite parser not available: {e}", "probe_id": probe_id}
-
-        all_pairs: list[dict[str, Any]] = []
-        per_simulation: list[dict[str, Any]] = []
 
         # List .hlt replay files
         ls_result = arena.environment.execute("ls /logs/*.hlt 2>/dev/null || echo 'NONE'")
@@ -1151,6 +1065,7 @@ IMPORTANT: This file may exceed your context window. Use commands to explore:
             return {"error": "No replay files found", "probe_id": probe_id}
 
         sim_files = [f.strip() for f in ls_result["output"].strip().split("\n") if f.strip()]
+        replays: list[tuple[str, dict[str, Any]]] = []
 
         for sim_file in sim_files:
             cat_result = arena.environment.execute(f"cat {sim_file}")
@@ -1162,69 +1077,9 @@ IMPORTANT: This file may exceed your context window. Use commands to explore:
             except json.JSONDecodeError:
                 continue
 
-            player_names = data.get("player_names", [])
-            if len(player_names) < 2:
-                continue
+            replays.append((sim_file.split("/")[-1], data))
 
-            # Halite bots self-identify (e.g. "MyCBot", "ImprovedBotV2"),
-            # not as "probe"/"target".  The probe is always player 1 (argv
-            # order in _execute_halite_probe) and the target is player 2.
-            probe_tag = 1  # 1-based
-            target_tag = 2
-
-            frames = data.get("frames", [])
-            moves = data.get("moves", [])
-            height = data.get("height", 0)
-            width = data.get("width", 0)
-
-            sim_pairs = []
-            for turn_idx in range(len(moves)):
-                frame = frames[turn_idx]
-                move_grid = moves[turn_idx]
-
-                # Extract per-cell actions for each player
-                probe_action = []
-                target_action = []
-                for r in range(height):
-                    for c in range(width):
-                        owner = frame[r][c][0]
-                        move = move_grid[r][c]
-                        if owner == probe_tag:
-                            probe_action.append([r, c, move])
-                        elif owner == target_tag:
-                            target_action.append([r, c, move])
-
-                probe_action.sort()
-                target_action.sort()
-
-                state = extract_player_state(frame, turn_idx, target_tag, data)
-                distance = actions_distance(probe_action, target_action)
-
-                pair = {
-                    "turn": turn_idx,
-                    "probe_action": probe_action,
-                    "target_action": target_action,
-                    "distance": distance,
-                    "target_state": state,
-                }
-                sim_pairs.append(pair)
-                all_pairs.append(pair)
-
-            per_simulation.append(
-                {
-                    "file": sim_file.split("/")[-1],
-                    "num_turns": len(sim_pairs),
-                }
-            )
-
-        return {
-            "probe_id": probe_id,
-            "description": "probe vs target - showing what each did in same state",
-            "total_turns": len(all_pairs),
-            "num_simulations": len(per_simulation),
-            "per_simulation": per_simulation,
-            "pairs": all_pairs,
-        }
+        return build_probe_trace_payload(replays, probe_id)
 
     def _parse_huskybench_probe_traces(self, arena: CodeArena, probe_id: int) -> dict[str, Any]:
         """Parse probe traces from HuskyBench ``game_log_*.json`` files.
@@ -1235,96 +1090,31 @@ IMPORTANT: This file may exceed your context window. Use commands to explore:
         to view only the target's behaviour.
         """
         try:
-            from revenge_bench.traces.parsers.huskybench import (
-                ROUND_NAMES,
-                _reconstruct_state_at_action,
-                normalize_action,
-            )
+            from revenge_bench.traces.parsers.huskybench import build_probe_trace_payload
         except ImportError as e:
             return {
                 "error": f"HuskyBench parser not available: {e}",
                 "probe_id": probe_id,
             }
 
-        all_pairs: list[dict[str, Any]] = []
-        per_simulation: list[dict[str, Any]] = []
-
         ls_result = arena.environment.execute("ls /app/output/game_log_*.json 2>/dev/null || echo 'NONE'")
         if "NONE" in ls_result.get("output", ""):
             return {"error": "No game log files found", "probe_id": probe_id}
 
         sim_files = [f.strip() for f in ls_result["output"].strip().split("\n") if f.strip()]
+        simulations: list[tuple[str, dict[str, Any]]] = []
 
-        for hand_idx, sim_file in enumerate(sim_files):
+        for sim_file in sim_files:
             cat_result = arena.environment.execute(f"cat {sim_file}")
             if cat_result.get("returncode", 0) != 0:
                 continue
 
             try:
-                hand_data = json.loads(cat_result["output"])
+                simulations.append((sim_file.split("/")[-1], json.loads(cat_result["output"])))
             except json.JSONDecodeError:
                 continue
 
-            player_names = hand_data.get("playerNames", {})
-            rounds_data = hand_data.get("rounds", {})
-            hand_pairs: list[dict[str, Any]] = []
-
-            for round_key in sorted(rounds_data.keys(), key=int):
-                round_idx = int(round_key)
-                round_data = rounds_data[round_key]
-                action_sequence = round_data.get("action_sequence", [])
-
-                for action_idx, seq_action in enumerate(action_sequence):
-                    acting_pid = str(seq_action.get("player", ""))
-                    acting_name = player_names.get(acting_pid, f"player{acting_pid}")
-
-                    state = _reconstruct_state_at_action(
-                        hand_data=hand_data,
-                        action_idx=action_idx,
-                        round_idx=round_idx,
-                        player_id=acting_pid,
-                        player_name=acting_name,
-                        hand_number=hand_idx,
-                    )
-
-                    raw_action = seq_action.get("action", "")
-                    amount = seq_action.get("amount", 0)
-                    my_stack = state["my_stack"]
-
-                    if raw_action.upper() == "RAISE":
-                        action = normalize_action(
-                            {"action": raw_action, "amount": amount},
-                            player_stack=my_stack,
-                        )
-                    else:
-                        action = normalize_action(raw_action)
-
-                    hand_pairs.append(
-                        {
-                            "hand": hand_idx,
-                            "round": ROUND_NAMES.get(round_idx, f"round_{round_idx}"),
-                            "player": acting_name,
-                            "action": action,
-                            "state": state,
-                        }
-                    )
-
-            all_pairs.extend(hand_pairs)
-            per_simulation.append(
-                {
-                    "file": sim_file.split("/")[-1],
-                    "num_actions": len(hand_pairs),
-                }
-            )
-
-        return {
-            "probe_id": probe_id,
-            "description": "probe vs target poker hands — each entry is one player's decision with full game state",
-            "total_turns": len(all_pairs),
-            "num_simulations": len(per_simulation),
-            "per_simulation": per_simulation,
-            "pairs": all_pairs,
-        }
+        return build_probe_trace_payload(simulations, probe_id)
 
 
 # Register the tournament type
