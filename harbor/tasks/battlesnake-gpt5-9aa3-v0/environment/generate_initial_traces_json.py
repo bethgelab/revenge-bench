@@ -34,6 +34,7 @@ def main() -> int:
         learner_name="learner",
         learner_code_dir=SUBMISSION.parent,
         submission=SUBMISSION.name,
+        include_diagnostics=True,
     )
     if summary.get("error"):
         print(f"failed to generate initial traces.json: {summary['error']}", file=sys.stderr)

@@ -217,6 +217,7 @@ def score(
         learner_name=learner_name,
         move_provider=provider,
         evaluation_type="offline_artifact",
+        include_diagnostics=True,
     )
 
 

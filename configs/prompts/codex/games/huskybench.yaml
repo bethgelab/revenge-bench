@@ -99,21 +99,18 @@ game_description: |
   distance 1 from CHECK, at any stack size.
 
   ## How It Works (IMPORTANT)
-  {% if route == "harbor" %}
-  This Harbor task is one continuous session:
+  {% if route == "harbor" %}This Harbor task is one continuous session:
   1. You start with visible round-0 target-vs-opponent traces and the starter's `traces.json`
   2. You can run controlled probes with `sudo run_probe`
   3. You edit `client/player.py` based on visible traces + probe results
   4. Your final `client/player.py` is evaluated once offline against fresh hidden target traces
   5. Your code is scored by action distance against target (lower = better, 0 = perfect)
-  {% else %}
-  Each round:
+  {% else %}Each round:
   1. You PROBE first to test hypotheses about the target
   2. You EDIT your submission based on probe results + traces
   3. At round end, main simulation runs: target vs MULTIPLE opponents
   4. You get traces showing target's actions against different opponents
-  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect)
-  {% endif %}
+  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect){% endif %}
 
   ## Multi-Opponent Advantage
 

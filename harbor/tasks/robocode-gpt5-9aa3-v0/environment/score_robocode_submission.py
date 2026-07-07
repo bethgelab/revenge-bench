@@ -161,6 +161,7 @@ def evaluate(
             move_provider=provider,
             parser_target_name=parser_target_name,
             evaluation_type="offline_artifact",
+            include_diagnostics=True,
         )
 
     (out_dir / "eval.json").write_text(json.dumps(payload, indent=2) + "\n")

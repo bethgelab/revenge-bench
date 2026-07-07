@@ -19,19 +19,16 @@ game_description: |
   See `runGame.sh` under `submission/<language>/` for compile/run instructions.
 
   ## How It Works (IMPORTANT)
-  {% if route == "harbor" %}
-  You work in ONE container session (no rounds):
+  {% if route == "harbor" %}You work in ONE container session (no rounds):
   1. You PROBE the sealed target to test hypotheses about its behavior
   2. You EDIT your submission based on probe results + visible traces
   3. When you finish, your submission is evaluated OFFLINE against fresh target-vs-opponent games generated after your work session — accuracy = how often your action matches the target's
-  {% else %}
-  Each round:
+  {% else %}Each round:
   1. You PROBE first to test hypotheses about the target
   2. You EDIT your submission based on probe results + traces
   3. At round end, main simulation runs: target vs MULTIPLE opponents
   4. You get traces showing target's actions against different opponents
-  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect)
-  {% endif %}
+  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect){% endif %}
 
   ## Multi-Opponent Advantage
 

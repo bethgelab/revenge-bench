@@ -117,6 +117,7 @@ def test_battlesnake_none_actions_are_reported_not_scored(tmp_path: Path):
         target_name="target",
         learner_name="learner",
         move_provider=move_provider,
+        include_diagnostics=True,
     )
 
     assert summary["expected_actions"] == 2
@@ -240,7 +241,16 @@ def test_build_summary_schema_and_stats():
         {"sim_file": "sim_0.jsonl", "turn": 1, "learner_action": "right", "target_action": "up", "distance": 1.0, "state": {}},
     ]
     summary = build_trace_summary(
-        3, "BattleSnake", "learner", "target", "offline", 2, 1.0, per_simulation, all_nonzero
+        3,
+        "BattleSnake",
+        "learner",
+        "target",
+        "offline",
+        2,
+        1.0,
+        per_simulation,
+        all_nonzero,
+        include_diagnostics=True,
     )
     assert summary["round"] == 3
     assert summary["game"] == "BattleSnake"
@@ -258,6 +268,45 @@ def test_build_summary_schema_and_stats():
     assert summary["nonzero_distances"] == all_nonzero
     # String actions -> no component_errors block.
     assert "component_errors" not in summary
+
+
+def test_build_summary_legacy_schema_excludes_diagnostics_by_default():
+    per_simulation = [
+        {
+            "file": "sim_0.jsonl",
+            "total": 2,
+            "distance_sum": 1.0,
+            "mean_distance": 0.5,
+            "num_nonzero": 1,
+            "expected_total": 3,
+            "skipped_none": 1,
+        },
+    ]
+    summary = build_trace_summary(
+        3,
+        "BattleSnake",
+        "learner",
+        "target",
+        "offline",
+        2,
+        1.0,
+        per_simulation,
+        [],
+    )
+
+    assert "scored_actions" not in summary
+    assert "expected_actions" not in summary
+    assert "skipped_none_actions" not in summary
+    assert "skipped_none_fraction" not in summary
+    assert summary["per_simulation"] == [
+        {
+            "file": "sim_0.jsonl",
+            "total": 2,
+            "distance_sum": 1.0,
+            "mean_distance": 0.5,
+            "num_nonzero": 1,
+        },
+    ]
 
 
 def test_build_summary_zero_actions_is_infinite():

@@ -103,7 +103,6 @@ where S is the actor's stack at the decision. An all-in is always
 distance 1 from CHECK, at any stack size.
 
 ## How It Works (IMPORTANT)
-
 This Harbor task is one continuous session:
 1. You start with visible round-0 target-vs-opponent traces and the starter's `traces.json`
 2. You can run controlled probes with `sudo run_probe`

@@ -165,6 +165,7 @@ def evaluate(
         learner_name="learner",
         action_provider=provider,
         evaluation_type="offline_artifact",
+        include_diagnostics=True,
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "eval.json").write_text(json.dumps(payload, indent=2) + "\n")

@@ -26,6 +26,7 @@ def main() -> int:
             learner_name="learner",
             action_provider=provider,
             evaluation_type="offline_bot_class",
+            include_diagnostics=True,
         )
     (round_dir / "traces.json").write_text(json.dumps(payload, indent=2) + "\n")
     return 0

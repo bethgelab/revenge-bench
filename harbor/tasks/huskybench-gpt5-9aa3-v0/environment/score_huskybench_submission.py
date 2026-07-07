@@ -150,6 +150,7 @@ def evaluate(
             learner_name=learner_name,
             action_provider=provider,
             evaluation_type="offline_artifact",
+            include_diagnostics=True,
         )
 
     (out_dir / "eval.json").write_text(json.dumps(payload, indent=2) + "\n")

@@ -415,6 +415,7 @@ def evaluate_battlesnake_submission_with_move_provider(
     *,
     logger=None,
     evaluation_type: str = "offline",
+    include_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Score BattleSnake traces using a caller-supplied learner action provider."""
 
@@ -442,6 +443,7 @@ def evaluate_battlesnake_submission_with_move_provider(
         total_distance,
         per_simulation,
         all_nonzero,
+        include_diagnostics=include_diagnostics,
     )
 
 
@@ -544,6 +546,7 @@ def evaluate_halite_submission_with_action_provider(
     *,
     logger=None,
     evaluation_type: str = "offline_subprocess",
+    include_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Score Halite I traces using a caller-supplied compiled-bot provider."""
 
@@ -571,6 +574,7 @@ def evaluate_halite_submission_with_action_provider(
         total_distance,
         per_simulation,
         all_nonzero,
+        include_diagnostics=include_diagnostics,
     )
 
 
@@ -724,6 +728,7 @@ def evaluate_robotrumble_submission_with_action_provider(
     fallback_target_team: str = "Blue",
     logger=None,
     evaluation_type: str = "offline",
+    include_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Score RobotRumble traces using a caller-supplied JS action provider."""
 
@@ -758,6 +763,7 @@ def evaluate_robotrumble_submission_with_action_provider(
         total_distance,
         per_simulation,
         all_nonzero,
+        include_diagnostics=include_diagnostics,
     )
 
 
@@ -900,6 +906,7 @@ def evaluate_robocode_submission_with_move_provider(
     parser_target_name: str | None = None,
     evaluation_type: str = "offline",
     logger=None,
+    include_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Score RoboCode traces using a caller-supplied learner move provider."""
     sim_files = find_robocode_sim_files(round_dir)
@@ -926,6 +933,7 @@ def evaluate_robocode_submission_with_move_provider(
         total_distance,
         per_simulation,
         all_nonzero,
+        include_diagnostics=include_diagnostics,
     )
 
 
@@ -1124,6 +1132,7 @@ def evaluate_huskybench_submission_with_action_provider(
     *,
     evaluation_type: str = "offline_bot_class",
     logger=None,
+    include_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Score HuskyBench traces using a caller-supplied action provider."""
     sim_files = find_huskybench_sim_files(round_dir)
@@ -1150,6 +1159,7 @@ def evaluate_huskybench_submission_with_action_provider(
         total_distance,
         per_simulation,
         all_nonzero,
+        include_diagnostics=include_diagnostics,
     )
 
 
@@ -1229,6 +1239,8 @@ def build_trace_summary(
     total_distance: float,
     per_simulation: list[dict],
     all_nonzero: list[dict],
+    *,
+    include_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Compute the offline-evaluation summary dict (does **not** write a file).
 
@@ -1256,13 +1268,27 @@ def build_trace_summary(
         distance_std = 0.0
         distance_se = 0.0
 
-    expected_actions = sum(
-        int(s.get("expected_total", s.get("total", 0))) for s in per_simulation
-    )
-    skipped_none_actions = sum(int(s.get("skipped_none", 0)) for s in per_simulation)
-    skipped_none_fraction = (
-        skipped_none_actions / expected_actions if expected_actions > 0 else 0.0
-    )
+    if include_diagnostics:
+        output_per_simulation = per_simulation
+        expected_actions = sum(
+            int(s.get("expected_total", s.get("total", 0))) for s in per_simulation
+        )
+        skipped_none_actions = sum(int(s.get("skipped_none", 0)) for s in per_simulation)
+        skipped_none_fraction = (
+            skipped_none_actions / expected_actions if expected_actions > 0 else 0.0
+        )
+    else:
+        # Preserve the pre-Harbor normal-path traces.json schema byte-for-byte:
+        # diagnostic keys are useful for Harbor audit logs, but the native
+        # benchmark historically did not emit them.
+        output_per_simulation = [
+            {
+                key: value
+                for key, value in sim.items()
+                if key not in {"expected_total", "skipped_none"}
+            }
+            for sim in per_simulation
+        ]
 
     summary: dict[str, Any] = {
         "round": round_num,
@@ -1271,18 +1297,19 @@ def build_trace_summary(
         "target": target_name,
         "evaluation_type": evaluation_type,
         "total_actions": total_actions,
-        "scored_actions": total_actions,
-        "expected_actions": expected_actions,
-        "skipped_none_actions": skipped_none_actions,
-        "skipped_none_fraction": skipped_none_fraction,
         "total_distance": total_distance,
         "mean_distance": mean_distance,
         "mean_distance_across_sims": mean_distance_across_sims,
         "distance_std": distance_std,
         "distance_se": distance_se,
         "num_simulations": len(per_simulation),
-        "per_simulation": per_simulation,
+        "per_simulation": output_per_simulation,
     }
+    if include_diagnostics:
+        summary["scored_actions"] = total_actions
+        summary["expected_actions"] = expected_actions
+        summary["skipped_none_actions"] = skipped_none_actions
+        summary["skipped_none_fraction"] = skipped_none_fraction
 
     # Per-component error breakdown (RoboCode: 5-component actions)
     if all_nonzero and isinstance(all_nonzero[0].get("learner_action"), dict):
@@ -1307,6 +1334,7 @@ def evaluate_battlesnake_submission(
     submission: str = "main.py",
     *,
     logger=None,
+    include_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Score a BattleSnake submission against the frozen traces in *round_dir*.
 
@@ -1339,4 +1367,5 @@ def evaluate_battlesnake_submission(
         move_provider=make_inprocess_move_provider(move_func, logger=logger),
         logger=logger,
         evaluation_type="offline",
+        include_diagnostics=include_diagnostics,
     )
