@@ -30,6 +30,7 @@ uv.lock.backup
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+**/__pycache__/
 *.py[codz]
 *$py.class
 
@@ -51,6 +52,7 @@ sdist/
 var/
 wheels/
 share/python-wheels/
+harbor/jobs/
 *.egg-info/
 .installed.cfg
 *.egg
