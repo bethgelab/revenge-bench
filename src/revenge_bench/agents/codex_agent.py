@@ -35,10 +35,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
-from jinja2 import StrictUndefined, Template
-
 from revenge_bench.agents.player import Player
-from revenge_bench.agents.utils import GameContext
+from revenge_bench.agents.utils import GameContext, render_prompt_sections
 from revenge_bench.utils.environment import (
     ContainerEnvironment,
     copy_to_container,
@@ -960,7 +958,6 @@ class CodexInverseStrategyAgent(Player):
         """
         tpl = self.game_context.to_template_vars()
         agent_cfg = self.config.get("config", {}).get("agent", {})
-        ctx = {**agent_cfg, **tpl}
 
         sections: list[str] = []
         if round_recovery_note is not None:
@@ -969,11 +966,7 @@ class CodexInverseStrategyAgent(Player):
                 "restarting this round with a fresh Codex session.]\n"
                 + render_transition_summary(self.game_context.round, round_recovery_note)
             )
-        for key in ("system_template", "instance_template"):
-            raw = agent_cfg.get(key)
-            if raw:
-                rendered = Template(str(raw), undefined=StrictUndefined).render(**ctx)
-                sections.append(rendered.rstrip())
+        sections.extend(render_prompt_sections(agent_cfg, tpl))
         if not sections:
             raise RuntimeError(
                 f"agent {self.name!r}: no system_template / instance_template "

@@ -13,14 +13,37 @@ game_description: |
   - If you collide or run out of health, you die
 
   ## How It Works (IMPORTANT)
-  Each round:
+  {% if route == "harbor" %}You work in ONE container session (no rounds):
+  1. You PROBE the sealed target to test hypotheses about its behavior
+  2. You EDIT main.py based on what your probes reveal
+  3. When you finish, main.py is evaluated OFFLINE against fresh target-vs-opponent games generated after your work session — accuracy = how often your action matches the target's{% else %}Each round:
   1. You PROBE first to test hypotheses about the target
   2. You EDIT main.py based on probe results + traces
   3. At round end, main simulation runs: target vs MULTIPLE opponents
   4. You get traces showing target's actions against different opponents
-  5. Your main.py is evaluated for accuracy against target
+  5. Your main.py is evaluated for accuracy against target{% endif %}
 
-  ## Multi-Opponent Advantage
+  {% if route == "harbor" %}## Prior Evidence + Probe Data
+
+  You start with a visible round-0 trace bundle generated from the normal
+  RevengeBench benchmark split: target vs the same sampled opponent pool used by
+  the normal path. These traces are prior evidence only — they are NOT the final
+  evaluation labels.
+
+  Each `sudo run_probe` plays several games between your probe bot and the target,
+  so a single probe yields many additional (state, action) pairs across diverse
+  board states.
+
+  **The target's strategy is FIXED and never changes.** Different probe bots and
+  different opponents create different board states, but they never change the
+  target's decision rules. Use this to your advantage:
+
+  - **Find invariant rules** — what does the target ALWAYS do, regardless of the
+    situation? These are the core decision rules you need to code.
+  - **Cross-validate hypotheses** — if a rule holds in the prior traces but not
+    in probes, it's probably not the right rule. True target rules are universal.
+  - **Don't overfit to visible traces or one probe** — build general rules that
+    work in any game situation, not just the positions you happened to see.{% else %}## Multi-Opponent Advantage
 
   Each round the target plays against MULTIPLE different opponents. This gives
   you **richer data** — you see how the target behaves in diverse game situations
@@ -35,30 +58,48 @@ game_description: |
   - **Cross-validate hypotheses** — if a rule holds against opponent A but not
     opponent B, it's probably not the right rule. True target rules are universal.
   - **Don't overfit to one opponent's traces** — build general rules that work
-    in any game situation, not just the specific positions you've seen.
+    in any game situation, not just the specific positions you've seen.{% endif %}
 
   ## IMPORTANT: Probe-First Workflow
 
   **Always probe BEFORE editing main.py.** Probes are your primary tool for
-  understanding the target. Traces only show what happened — probes let you
-  run controlled experiments.
+  understanding the target. {% if route == "harbor" %}The visible round-0 traces show what happened in
+  the normal benchmark split; probes let you run controlled experiments against
+  the sealed target.{% else %}Traces only show what happened — probes let you
+  run controlled experiments.{% endif %}
 
-  **Recommended workflow each round:**
-  1. Read traces.json — identify mismatches
+  **Recommended workflow{% if route == "harbor" %}{% else %} each round{% endif %}:**
+  {% if route == "harbor" %}1. Read `rounds/0/traces.json` — identify starter mismatches and current distance
+  2. Read the visible `rounds/0/opp_*/sim_*.jsonl` traces — identify target behavior across opponents
+  3. Form a hypothesis (e.g., "target prefers food over safety")
+  4. Design a probe to elicit specific behavior from the target (modify probe.py to create that scenario)
+  5. Run `sudo run_probe` and analyze `probe_trace_{N}.json`
+  6. Run 1-2 more probes to refine understanding
+  7. THEN edit main.py based on confirmed hypotheses{% else %}1. Read traces.json — identify mismatches
   2. Form a hypothesis (e.g., "target prefers food over safety")
   3. Design a probe to elicit specific behavior from the target (modify probe.py to create that scenario)
   4. Call the `run_probe` MCP tool and analyze results
   5. Run 1-2 more probes to refine understanding
-  6. THEN edit main.py based on confirmed hypotheses
+  6. THEN edit main.py based on confirmed hypotheses{% endif %}
 
   Probes are cheap and fast. Editing main.py without probing first is like
-  coding without testing — you'll waste rounds on wrong guesses.
+  coding without testing — you'll waste {% if route == "harbor" %}your budget{% else %}rounds{% endif %} on wrong guesses.
 
   ## Inline Probing (YOUR PRIMARY TOOL)
 
   You can run probe simulations AT ANY TIME during editing!
 
-  `probe.py` is automatically seeded from your current `main.py` at the start of each round.
+  {% if route == "harbor" %}`probe.py` starts as a copy of `main.py`. You just need to modify it to
+  create the test scenario you want, then run `sudo run_probe`.
+
+  ### How to Probe
+  1. Edit `probe.py` implementing a strategy that will elicit the behavior you want to test
+  2. Run `sudo run_probe` — the system will play your probe.py against the sealed target
+  3. Read `{{working_dir}}/probe_trace_{N}.json` to see what the target did in the situations your probe created
+
+  You have a bounded probe budget (see `{{working_dir}}/.probe_budget`; it
+  decrements on each probe and `probes_remaining` is reported in every result).
+  **Spend it deliberately — aim to use several probes before you settle on main.py.**{% else %}`probe.py` is automatically seeded from your current `main.py` at the start of each round.
   You just need to modify it to create the test scenario you want, then call the `run_probe` MCP tool.
 
   ### How to Probe
@@ -66,7 +107,7 @@ game_description: |
   2. Call the `run_probe` MCP tool — the system will play your probe.py against the target
   3. Read the results to see what the target did in the situations your probe created
 
-  You get up to 5 probes per round. **Aim to use at least 2 per round.**
+  You get up to 5 probes per round. **Aim to use at least 2 per round.**{% endif %}
 
   ### ⚠️ CRITICAL: Separate Exploration from Exploitation
 
@@ -86,7 +127,25 @@ game_description: |
   - **main.py = production** — only deploy validated findings here
 
   ### Probe Output Format
+  {% if route == "harbor" %}Each probe writes `{{working_dir}}/probe_trace_{N}.json`:
   ```json
+  {
+    "probe_id": 1,
+    "description": "probe vs target - showing what each did in the same state",
+    "total_turns": 45,
+    "num_simulations": 3,
+    "pairs": [
+      {
+        "turn": 5,
+        "probe_action": "up",
+        "target_action": "right",
+        "distance": 1.0,
+        "target_state": {...}
+      }
+    ],
+    "probes_remaining": 9
+  }
+  ```{% else %}```json
   {
     "probe_id": 1,
     "description": "Your probe.py vs target",
@@ -100,7 +159,7 @@ game_description: |
       }
     ]
   }
-  ```
+  ```{% endif %}
 
   ### Probing Strategy
   - **Create specific scenarios**: Make probe.py behave in ways that force interesting situations
@@ -110,16 +169,22 @@ game_description: |
   - **Look for invariants**: Target rules that hold across ALL opponents are the most reliable
 
   ## Key Files
-  - `main.py` - Your recovered policy (EDIT THIS - evaluated for accuracy). **Only edit after probing.**
+  {% if route == "harbor" %}- `main.py` - Your recovered policy (EDIT THIS - graded offline once at the end). **Only edit after probing.**
+  - `probe.py` - Your experiment instrument. **Must differ from main.py.** Starts as a copy of main.py.
+  - `docs/` - Game documentation and API reference
+  - `rounds/0/traces.json` - Initial normal-path-style distance summary and target-action mismatches for the starter bot
+  - `rounds/0/opp_*/sim_*.jsonl` - Visible prior target-vs-opponent traces generated with the normal benchmark split
+  - `{{working_dir}}/probe_trace_{N}.json` - Results from your probes (target's actions vs your probe's, per turn)
+  - `{{working_dir}}/.probe_budget` - How many probes you have left{% else %}- `main.py` - Your recovered policy (EDIT THIS - evaluated for accuracy). **Only edit after probing.**
   - `probe.py` - Your experiment instrument. **Must differ from main.py.** Auto-seeded each round.
   - `docs/` - Game documentation and API reference
   - `/logs/rounds/{N}/traces.json` - Accuracy results and mismatches
-  - `/logs/rounds/{N}/sim_*.jsonl` - Raw game traces (target vs MULTIPLE opponents)
+  - `/logs/rounds/{N}/sim_*.jsonl` - Raw game traces (target vs MULTIPLE opponents){% endif %}
 
   ## Tips
   - **PROBE FIRST** — don't jump straight to editing main.py
   - **Keep probe.py different from main.py** — identical probes waste your probe budget
   - After each probe, write a brief analysis before probing again
   - **Build opponent-invariant rules** — focus on what the target ALWAYS does
-  - Traces from different opponents reveal different aspects of the target's strategy
+  {% if route == "harbor" %}- Visible traces and probe games reveal different aspects of the target's strategy{% else %}- Traces from different opponents reveal different aspects of the target's strategy{% endif %}
   - probe.py is safe to experiment with — main.py is your graded submission
