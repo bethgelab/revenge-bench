@@ -40,6 +40,25 @@ def _read_actions(path: Path, expected: int) -> list[Any]:
     return actions
 
 
+def _write_runner_status(
+    out_dir: Path,
+    *,
+    status: str,
+    returncode: int | None = None,
+    timeout_sec: int | None = None,
+    message: str | None = None,
+) -> None:
+    payload = {
+        "status": status,
+        "returncode": returncode,
+        "timeout_sec": timeout_sec,
+        "message": message,
+    }
+    (out_dir / "learner-runner.status.json").write_text(
+        json.dumps(payload, indent=2) + "\n"
+    )
+
+
 def _make_artifact_node_provider(
     robot_js: Path,
     *,
@@ -86,7 +105,33 @@ def _make_artifact_node_provider(
         with (out_dir / "learner-runner.stdout").open("w", encoding="utf-8") as stdout, (
             out_dir / "learner-runner.stderr"
         ).open("w", encoding="utf-8") as stderr:
-            subprocess.run(cmd, stdout=stdout, stderr=stderr, text=True, timeout=180)
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True,
+                    timeout=180,
+                )
+            except subprocess.TimeoutExpired as exc:
+                stderr.write(f"\nRobotRumble learner runner timed out after {exc.timeout}s\n")
+                _write_runner_status(
+                    out_dir,
+                    status="timeout",
+                    timeout_sec=int(exc.timeout or 180),
+                    message="scoring degraded to missing actions",
+                )
+                return _read_actions(actions_path, len(harness_inputs))
+
+        if proc.returncode != 0:
+            _write_runner_status(
+                out_dir,
+                status="nonzero_exit",
+                returncode=proc.returncode,
+                message="scoring degraded to runner-provided or missing actions",
+            )
+        else:
+            _write_runner_status(out_dir, status="ok", returncode=0)
         return _read_actions(actions_path, len(harness_inputs))
 
     return provider

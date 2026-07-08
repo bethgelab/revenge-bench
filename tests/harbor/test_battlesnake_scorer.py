@@ -93,6 +93,8 @@ def _run_scorer(tmp_path: Path, submission_src: str) -> dict:
             "target",
             "--runner",
             str(RUNNER),
+            "--runner-user",
+            "root" if getattr(os, "geteuid", lambda: -1)() == 0 else "agent",
             "--out-dir",
             str(out_dir),
         ],
