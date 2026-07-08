@@ -24,6 +24,7 @@ figures/**
 !figures/.gitkeep
 logs_keep/**
 uv.lock.backup
+harbor/
 
 
 # -------------
