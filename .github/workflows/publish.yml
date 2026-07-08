@@ -77,6 +77,8 @@ jobs:
           Highlights:
           - Publishes \`revenge-bench\` ${GITHUB_REF_NAME#v} to PyPI: https://pypi.org/project/revenge-bench/${GITHUB_REF_NAME#v}/
           - Provides the \`revenge-bench\` and \`revenge-bench-pool-eval\` console scripts.
+          - Includes benchmark configs, target pools, and lightweight scripts in the wheel under \`revenge_bench/assets\`.
+          - Source checkouts continue to use the top-level \`configs/\`, \`data/\`, and \`scripts/\` directories.
           - Bundles the vendored CodeClash Python package so PyPI installs do not depend on an unpublished \`codeclash\` package.
           - Excludes Harbor task artifacts from the Python package.
 
@@ -87,16 +89,10 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" \
-              --title "RevengeBench $GITHUB_REF_NAME" \
-              --notes-file release-notes.md
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" dist/* \
-              --title "RevengeBench $GITHUB_REF_NAME" \
-              --notes-file release-notes.md
-          fi
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GH_RELEASE_TOKEN || github.token }}
+          name: RevengeBench ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: dist/*
+          fail_on_unmatched_files: true
