@@ -96,6 +96,9 @@ This iterates over `configs/benchmark/<model>/<model>_<game>.yaml`.
 Useful runner flags include `--dry-run`, `--resume`, `--parallel N`,
 `--configs "name_a name_b"`, and `--config-dir <dir>`.
 
+<details>
+<summary>Optional run modes</summary>
+
 Public optional conditions and baselines use the same runner:
 
 ```bash
@@ -111,7 +114,12 @@ bash scripts/run_forward_pvp.sh \
     --challengers "gpt5 gpt5-mini gpt-oss-120b grok-4.1-fast kimi-k2.6 deepseek-v3.2"
 ```
 
+</details>
+
 ## Optional Tracks
+
+<details>
+<summary>Track descriptions</summary>
 
 The main benchmark condition is active inverse-strategy recovery with probes.
 The public release also includes:
@@ -124,7 +132,12 @@ The public release also includes:
 Paper-only plotting, history-compaction sweeps, reset-memory sweeps, and probe
 prompt ablation suites are intentionally not part of this release package.
 
+</details>
+
 ## Adding Target Policies
+
+<details>
+<summary>Target policy layout and helper scripts</summary>
 
 Create a directory under `data/targets/<arena>/<policy_name>/` with a
 `main.py` implementing the arena's player API. See the existing target pools
@@ -138,7 +151,12 @@ extract runnable strategies, validate them, and run Elo selection:
 bash scripts/codeclash_strategies/build_pool.sh --game BattleSnake --count 40
 ```
 
+</details>
+
 ## Relationship To CodeClash
+
+<details>
+<summary>CodeClash dependency details</summary>
 
 RevengeBench started from CodeClash and still relies on CodeClash's arena and
 execution abstractions. The upstream CodeClash source is preserved as a
@@ -146,7 +164,12 @@ submodule in `vendor/codeclash`; RevengeBench-specific code lives in
 `src/revenge_bench` so the benchmark can evolve without modifying the vendored
 upstream tree.
 
+</details>
+
 ## Layout
+
+<details>
+<summary>Repository tree</summary>
 
 ```text
 revenge-bench/
@@ -169,6 +192,8 @@ revenge-bench/
 ├── tests/
 └── main.py                    # Compatibility entry point
 ```
+
+</details>
 
 ## Citation
 
