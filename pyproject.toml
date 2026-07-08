@@ -61,6 +61,7 @@ revenge_bench = [
     "arenas/**/*.def",
     "arenas/**/*.js",
     "arenas/**/main_seed.py",
+    "traces/parsers/*.js",
 ]
 
 [tool.pytest.ini_options]

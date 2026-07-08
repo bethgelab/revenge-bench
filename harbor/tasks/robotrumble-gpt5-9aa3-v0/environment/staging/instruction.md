@@ -211,18 +211,19 @@ This is NOT about winning the game - it's about matching the target's behavior e
 - Goal: If you were in the target's exact position, would you make the same decision?
 
 The key files are in this codebase (/workspace):
- - `main.py`: Your code to edit (must match target's behavior)
- - `docs/`: Game documentation
- - `probe.py`: Your probe instrument — run `sudo run_probe` to query the sealed target
+ - `robot.js`: Your recovered policy (must match target's behavior)
+ - `probe.js`: Your probe robot — run `sudo run_probe` to query the sealed target
+ - `rounds/0/traces.json`: Initial normal-path-style distance summary and target-action mismatches for the starter bot
+ - `rounds/0/opp_*/sim_*.json`: Visible prior target-vs-opponent RobotRumble simulations
  - `probe_trace_*.json`: Saved probe results (your only window into the target)
 
 ## Visible Evidence + Probe Results
 
 You work in a single container session — there is NO per-round scoring. You do
 start with the same kind of round-0 feedback used by the normal benchmark:
-`/workspace/rounds/0/traces.json` summarizes your starter `main.py`
+`/workspace/rounds/0/traces.json` summarizes your starter `robot.js`
 against visible target-vs-opponent traces, and
-`/workspace/rounds/0/opp_*/sim_*.jsonl` contains the raw traces. These are
+`/workspace/rounds/0/opp_*/sim_*.json` contains the raw traces. These are
 evidence, not final evaluation labels. Each `sudo run_probe` writes
 `/workspace/probe_trace_{N}.json` with additional (state, action) pairs the
 target produced against your probe.
@@ -248,19 +249,19 @@ target produced against your probe.
 
 ## Workflow
 
-1. **Explore `/workspace`** - read `main.py`, `docs/`, and the game code
+1. **Explore `/workspace`** - read `robot.js`, `probe.js`, and the game code
 2. **Read `rounds/0/traces.json` first** - check starter distance and target-action mismatches
-3. **Read visible raw traces** - inspect `rounds/0/opp_*/sim_*.jsonl` for target behavior across opponents
-4. **Probe early** - edit `probe.py`, run `sudo run_probe`, then read the resulting `probe_trace_{N}.json`
+3. **Read visible raw traces** - inspect `rounds/0/opp_*/sim_*.json` for target behavior across opponents
+4. **Probe early** - edit `probe.js`, run `sudo run_probe`, then read the resulting `probe_trace_{N}.json`
 5. **Look for patterns** - what rule is the target following across traces and probes?
-6. **Update `main.py`** - implement the pattern you discovered
-7. **Repeat while you have probe budget** - then leave `main.py` as your final policy; it is graded once, offline, after your session ends
+6. **Update `robot.js`** - implement the pattern you discovered
+7. **Repeat while you have probe budget** - then leave `robot.js` as your final policy; it is graded once, offline, after your session ends
 
 This is a single continuous session (no rounds). Your conversation history —
 earlier turns, tool outputs, and your own reasoning — stays visible throughout
 (older outputs may be compacted to summaries to save context). There is no
 repeated distance score during the session: the initial `traces.json`, visible
-raw traces, and probes are your feedback, and `main.py` is graded once after
+raw traces, and probes are your feedback, and `robot.js` is graded once after
 you finish against fresh hidden target traces.
 
 IMPORTANT: Store all changes in /workspace or subdirectories.
@@ -269,10 +270,10 @@ IMPORTANT: Store all changes in /workspace or subdirectories.
 
 1. Re-read prior turns: your earlier analysis is still in this conversation.
 2. Start by reading `rounds/0/traces.json` to see your starter distance and nonzero mismatches.
-3. Use `rounds/0/opp_*/sim_*.jsonl` as prior evidence, not as final labels.
-4. Probe before editing `main.py` — probes are your controlled experiments against the sealed target.
+3. Use `rounds/0/opp_*/sim_*.json` as prior evidence, not as final labels.
+4. Probe before editing `robot.js` — probes are your controlled experiments against the sealed target.
 5. Each `probe_trace_{N}.json` shows, per turn, what your probe did and what the target did in the same state — focus on the turns where they differ.
 6. The target likely follows simple rules (chase food, avoid walls, prefer certain directions).
-7. Test a hypothesis by making `probe.py` force the situation, then re-probe.
+7. Test a hypothesis by making `probe.js` force the situation, then re-probe.
 8. You can write analysis scripts to process both `rounds/0` and `probe_trace_*.json`.
 9. Keep everything inside `/workspace`.

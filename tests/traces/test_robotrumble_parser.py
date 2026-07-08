@@ -315,6 +315,14 @@ class TestRobotRumbleActionsDistance:
 
         assert actions_distance([], []) == 0.0
 
+    def test_missing_batch_vs_multi_unit_target_full_distance(self):
+        from revenge_bench.traces.parsers.robotrumble import actions_distance
+
+        target = [{"unit_id": "1", "action": {"type": "Move", "direction": "North"}}]
+        assert actions_distance(None, target) == 1.0
+        assert actions_distance({"error": "runner failed"}, target) == 1.0
+        assert actions_distance(target, None) == 1.0
+
 
 class TestRobotRumbleExtractStateActionPairs:
     """Tests for extract_state_action_pairs function."""

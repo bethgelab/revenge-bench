@@ -269,8 +269,16 @@ def actions_distance(a1: Any, a2: Any) -> float:
     Returns:
         Float between 0.0 and 1.0.
     """
+    a1_is_list = isinstance(a1, list)
+    a2_is_list = isinstance(a2, list)
+
+    # One side is a multi-unit action batch and the other is a scalar/missing
+    # action. Treat that as a failed batch, not as two scalar no-ops.
+    if a1_is_list != a2_is_list:
+        return 1.0
+
     # Both lists → multi-unit comparison
-    if isinstance(a1, list) and isinstance(a2, list):
+    if a1_is_list and a2_is_list:
         map1 = {
             entry["unit_id"]: entry.get("action")
             for entry in a1

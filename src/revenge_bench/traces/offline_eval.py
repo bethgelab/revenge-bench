@@ -1347,7 +1347,11 @@ def build_trace_summary(
         summary["skipped_none_fraction"] = skipped_none_fraction
 
     # Per-component error breakdown (RoboCode: 5-component actions)
-    if all_nonzero and isinstance(all_nonzero[0].get("learner_action"), dict):
+    if (
+        all_nonzero
+        and isinstance(all_nonzero[0].get("learner_action"), dict)
+        and isinstance(all_nonzero[0].get("target_action"), dict)
+    ):
         component_errors = compute_component_errors(all_nonzero, total_actions)
         if component_errors:
             summary["component_errors"] = component_errors
