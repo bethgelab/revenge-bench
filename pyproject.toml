@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "revenge-bench"
-version = "0.1.0"
+version = "0.1.1"
 description = "RevengeBench: reverse-engineering code-space policies from behavioral experiments"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -86,6 +86,9 @@ revenge_bench = [
     "arenas/**/*.js",
     "arenas/**/main_seed.py",
     "traces/parsers/*.js",
+    "assets/configs/**/*",
+    "assets/data/**/*",
+    "assets/scripts/**/*",
 ]
 codeclash = [
     "arenas/**/*.Dockerfile",

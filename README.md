@@ -62,8 +62,9 @@ pip install revenge-bench
 revenge-bench --help
 ```
 
-For full benchmark runs from the source tree, including configs, target pools,
-and the CodeClash submodule:
+The PyPI package includes the RevengeBench Python package, CLI entry points,
+benchmark configs, target pools, and lightweight scripts. For full benchmark
+reproduction and development from the source tree:
 
 ```bash
 git clone --recurse-submodules <repo-url> revenge-bench
