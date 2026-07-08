@@ -55,6 +55,16 @@ Wild: Safety, Security, and Beyond (AIWILD) at ICML 2026. See the
 
 ## Installation
 
+For the released Python package and CLI:
+
+```bash
+pip install revenge-bench
+revenge-bench --help
+```
+
+For full benchmark runs from the source tree, including configs, target pools,
+and the CodeClash submodule:
+
 ```bash
 git clone --recurse-submodules <repo-url> revenge-bench
 cd revenge-bench

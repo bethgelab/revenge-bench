@@ -54,3 +54,49 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.13.0
+
+  github-release:
+    needs: [build, publish-pypi]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v6
+        with:
+          name: python-distributions
+          path: dist
+
+      - name: Write release notes
+        run: |
+          cat > release-notes.md <<EOF
+          Python package release for RevengeBench.
+
+          Highlights:
+          - Publishes \`revenge-bench\` ${GITHUB_REF_NAME#v} to PyPI: https://pypi.org/project/revenge-bench/${GITHUB_REF_NAME#v}/
+          - Provides the \`revenge-bench\` and \`revenge-bench-pool-eval\` console scripts.
+          - Bundles the vendored CodeClash Python package so PyPI installs do not depend on an unpublished \`codeclash\` package.
+          - Excludes Harbor task artifacts from the Python package.
+
+          Install:
+          \`\`\`bash
+          pip install revenge-bench==${GITHUB_REF_NAME#v}
+          \`\`\`
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "RevengeBench $GITHUB_REF_NAME" \
+              --notes-file release-notes.md
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "RevengeBench $GITHUB_REF_NAME" \
+              --notes-file release-notes.md
+          fi
