@@ -27,6 +27,29 @@ ARENA="/run/probe_arena"                         # root-owned scratch
 SIMS_PER_PROBE="${SIMS_PER_PROBE:-3}"
 BOARD_W=11
 BOARD_H=11
+PROBE_PID=""
+TARGET_PID=""
+
+json_error() {
+    python3 -c 'import json, sys; print(json.dumps({"error": sys.argv[1]}))' "$1"
+}
+
+cleanup() {
+    [ -n "$PROBE_PID" ] && kill "$PROBE_PID" 2>/dev/null || true
+    [ -n "$TARGET_PID" ] && kill "$TARGET_PID" 2>/dev/null || true
+    pkill -f "$ARENA/probe/main.py" 2>/dev/null || true
+    pkill -f "$ARENA/target/main.py" 2>/dev/null || true
+}
+
+on_error() {
+    trap - ERR
+    cleanup
+    json_error "probe failed"
+    exit 0
+}
+
+trap on_error ERR
+trap cleanup EXIT
 
 # --- next probe number --------------------------------------------------------
 PROBE_NUM=1
@@ -41,7 +64,7 @@ if [ -f "$BUDGET_FILE" ]; then
     BUDGET=$(cat "$BUDGET_FILE" 2>/dev/null | tr -d '[:space:]')
     if [[ "$BUDGET" =~ ^[0-9]+$ ]] && [ "$BUDGET" -le 0 ]; then
         echo '{"error": "Probe budget exhausted (0 probes remaining). Prior results are in /workspace/probe_trace_*.json"}'
-        exit 1
+        exit 0
     fi
     if [[ "$BUDGET" =~ ^[0-9]+$ ]]; then
         REMAINING=$((BUDGET - 1))
@@ -60,11 +83,11 @@ export PYTHONNOUSERSITE=1
 # --- validate inputs ----------------------------------------------------------
 if [ ! -f "$PROBE_SRC" ]; then
     echo '{"error": "No probe bot found at /workspace/probe.py"}'
-    exit 1
+    exit 0
 fi
 if [ ! -f "$TARGET_SRC" ]; then
     echo '{"error": "Sealed target not found in container"}'
-    exit 1
+    exit 0
 fi
 
 # --- arena setup (root-owned; probe dir handed to agent, target dir sealed) ----
@@ -83,16 +106,6 @@ chmod 700 "$ARENA/target"
 # --- random loopback ports (not revealed to the agent) ------------------------
 PROBE_PORT=$(( 20000 + RANDOM % 20000 ))
 TARGET_PORT=$(( 40000 + RANDOM % 20000 ))
-
-PROBE_PID=""
-TARGET_PID=""
-cleanup() {
-    [ -n "$PROBE_PID" ] && kill "$PROBE_PID" 2>/dev/null || true
-    [ -n "$TARGET_PID" ] && kill "$TARGET_PID" 2>/dev/null || true
-    pkill -f "$ARENA/probe/main.py" 2>/dev/null || true
-    pkill -f "$ARENA/target/main.py" 2>/dev/null || true
-}
-trap cleanup EXIT
 
 # --- start servers ------------------------------------------------------------
 # Probe server runs the AGENT's code as the unprivileged `agent` user, so it can
@@ -130,7 +143,7 @@ for _ in $(seq 1 40); do
 done
 if [ "$ready" -ne 1 ]; then
     echo '{"error": "Probe/target servers did not start in time"}'
-    exit 1
+    exit 0
 fi
 
 # --- run probe simulations ----------------------------------------------------

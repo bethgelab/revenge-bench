@@ -5,14 +5,14 @@ BUDGET_FILE="/workspace/.probe_budget"
 SIMS="${SIMS_PER_PROBE:-3}"
 
 if [[ ! -f "$BUDGET_FILE" ]]; then
-  echo "probe budget file missing" >&2
-  exit 1
+  echo '{"error": "probe budget file missing"}'
+  exit 0
 fi
 
 remaining="$(cat "$BUDGET_FILE")"
 if [[ "$remaining" -le 0 ]]; then
-  echo "probe budget exhausted" >&2
-  exit 1
+  echo '{"error": "probe budget exhausted"}'
+  exit 0
 fi
 
 probe_id="$((26 - remaining))"

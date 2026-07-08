@@ -31,19 +31,19 @@ def _set_budget(value: int) -> None:
     BUDGET.write_text(f"{value}\n")
 
 
-def main(argv: list[str]) -> int:
+def _run(argv: list[str]) -> int:
     remaining = _budget()
     if remaining <= 0:
         print(json.dumps({"error": "probe budget exhausted"}, indent=2))
-        return 1
+        return 0
 
     probe_dir = WORKSPACE / "probe"
     if not (probe_dir / "client" / "player.py").exists():
         print(json.dumps({"error": f"missing {probe_dir / 'client' / 'player.py'}"}, indent=2))
-        return 1
+        return 0
     if not (probe_dir / "client" / "main.py").exists():
         print(json.dumps({"error": f"missing {probe_dir / 'client' / 'main.py'}"}, indent=2))
-        return 1
+        return 0
 
     probe_id = 26 - remaining
     _set_budget(remaining - 1)
@@ -69,9 +69,13 @@ def main(argv: list[str]) -> int:
     return 0
 
 
-if __name__ == "__main__":
+def main(argv: list[str]) -> int:
     try:
-        raise SystemExit(main(sys.argv))
+        return _run(argv)
     except Exception as exc:
-        print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
-        raise
+        print(json.dumps({"error": str(exc)}, indent=2))
+        return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

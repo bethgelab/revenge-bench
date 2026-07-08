@@ -8,14 +8,14 @@ export PYTHONNOUSERSITE=1
 
 BUDGET_FILE="/workspace/.probe_budget"
 if [[ ! -f "$BUDGET_FILE" ]]; then
-  echo "probe budget missing" >&2
-  exit 2
+  echo '{"error": "probe budget missing"}'
+  exit 0
 fi
 
 remaining="$(cat "$BUDGET_FILE")"
 if [[ "$remaining" -le 0 ]]; then
-  echo "probe budget exhausted" >&2
-  exit 3
+  echo '{"error": "probe budget exhausted"}'
+  exit 0
 fi
 
 probe_id=$((25 - remaining + 1))

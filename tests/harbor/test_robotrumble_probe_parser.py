@@ -2,8 +2,32 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+RUN_PROBE_IMPL = (
+    REPO_ROOT
+    / "harbor"
+    / "tasks"
+    / "robotrumble-gpt5-9aa3-v0"
+    / "environment"
+    / "run_probe_impl.py"
+)
+
+
+def _load_run_probe_impl():
+    spec = importlib.util.spec_from_file_location("robotrumble_run_probe_impl", RUN_PROBE_IMPL)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _robotrumble_probe_replay() -> dict:
@@ -74,3 +98,60 @@ def test_robotrumble_probe_payload_matches_normal_path_parser_byte_identically()
     assert json.dumps(normal_payload, sort_keys=True) == json.dumps(
         shared_payload, sort_keys=True
     )
+
+
+def test_robotrumble_probe_engine_failure_is_not_silent(tmp_path, monkeypatch):
+    module = _load_run_probe_impl()
+
+    class FailedProc:
+        returncode = 17
+        stderr = "engine exploded"
+
+    monkeypatch.setattr(module, "WORKSPACE", tmp_path)
+    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: FailedProc())
+
+    with pytest.raises(RuntimeError, match="probe sim 2 failed with exit code 17"):
+        module._run_simulation(["./rumblebot"], tmp_path / "sim.json", 2)
+
+
+def test_robotrumble_probe_timeout_is_not_silent(tmp_path, monkeypatch):
+    module = _load_run_probe_impl()
+
+    def fake_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=args[0], timeout=120)
+
+    monkeypatch.setattr(module, "WORKSPACE", tmp_path)
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="probe sim 0 timed out after 120s"):
+        module._run_simulation(["./rumblebot"], tmp_path / "sim.json", 0)
+
+
+def test_robotrumble_probe_invalid_json_is_not_silent(tmp_path, monkeypatch):
+    module = _load_run_probe_impl()
+
+    class OkProc:
+        returncode = 0
+        stderr = ""
+
+    def fake_run(*args, **kwargs):
+        kwargs["stdout"].write("not json")
+        return OkProc()
+
+    monkeypatch.setattr(module, "WORKSPACE", tmp_path)
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="probe sim 1 produced invalid JSON"):
+        module._run_simulation(["./rumblebot"], tmp_path / "sim.json", 1)
+
+
+def test_robotrumble_probe_wrapper_returns_normal_style_json_error(monkeypatch, capsys):
+    module = _load_run_probe_impl()
+
+    def fail(_argv):
+        raise RuntimeError("probe failed")
+
+    monkeypatch.setattr(module, "_run", fail)
+
+    assert module.main(["run_probe_impl.py", "1", "3"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"error": "probe failed"}
