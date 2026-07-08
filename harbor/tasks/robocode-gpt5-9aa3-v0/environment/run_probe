@@ -2,4 +2,10 @@
 set -euo pipefail
 export JAVA_HOME=/opt/java/openjdk
 export PATH="$JAVA_HOME/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-python3 -I /opt/robocode/run_probe_impl.py "$@"
+SIMS="${SIMS_PER_PROBE:-3}"
+exec env -i \
+  JAVA_HOME="$JAVA_HOME" \
+  PATH="$PATH" \
+  HOME=/root \
+  PYTHONNOUSERSITE=1 \
+  python3 -I /opt/robocode/run_probe_impl.py "$SIMS"

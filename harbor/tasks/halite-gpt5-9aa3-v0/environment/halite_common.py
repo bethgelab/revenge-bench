@@ -68,14 +68,19 @@ def compile_submission(submission: Path, *, timeout: int = 30) -> str:
     """Compile a Halite submission and return the executable path string."""
     main_files = [
         f.name
-        for f in submission.iterdir()
-        if f.name.startswith("main.") and f.suffix in MAP_FILE_TYPE_TO_RUN
+        for f in sorted(submission.iterdir(), key=lambda p: p.name)
+        if f.is_file() and f.name.startswith("main.") and f.suffix in MAP_FILE_TYPE_TO_RUN
     ]
-    if not main_files and (submission / "src" / "main.rs").exists():
+    found_main = len(main_files) == 1
+    if not found_main and (submission / "src" / "main.rs").exists():
         main_files = ["src/main.rs"]
-    if not main_files:
+        found_main = True
+    if not found_main:
         supported = "|".join(MAP_FILE_TYPE_TO_RUN)
-        raise RuntimeError(f"No supported main.[{supported}] file in {submission}")
+        raise RuntimeError(
+            f"Exactly one main.[{supported}] file must be present in submission, "
+            f"found {len(main_files)}"
+        )
 
     main = main_files[0]
     main_ext = Path(main).suffix

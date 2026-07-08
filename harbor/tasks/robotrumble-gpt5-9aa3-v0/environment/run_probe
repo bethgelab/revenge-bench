@@ -18,4 +18,8 @@ fi
 probe_id="$((26 - remaining))"
 echo "$((remaining - 1))" > "$BUDGET_FILE"
 
-python3 -I /opt/robotrumble/run_probe_impl.py "$probe_id" "$SIMS"
+env -i \
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  HOME=/root \
+  PYTHONNOUSERSITE=1 \
+  python3 -I /opt/robotrumble/run_probe_impl.py "$probe_id" "$SIMS"

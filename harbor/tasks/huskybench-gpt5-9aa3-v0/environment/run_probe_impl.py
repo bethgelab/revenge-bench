@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -32,7 +31,7 @@ def _set_budget(value: int) -> None:
     BUDGET.write_text(f"{value}\n")
 
 
-def main() -> int:
+def main(argv: list[str]) -> int:
     remaining = _budget()
     if remaining <= 0:
         print(json.dumps({"error": "probe budget exhausted"}, indent=2))
@@ -53,7 +52,7 @@ def main() -> int:
         shutil.rmtree(LOGS)
     LOGS.mkdir(parents=True)
 
-    sims = int(os.environ.get("SIMS_PER_PROBE", "50"))
+    sims = int(argv[1]) if len(argv) > 1 else 50
     # Normal interventionist HuskyBench probes start the probe client first and
     # the target client second. Keep that order fixed because poker position can
     # affect the state/action distribution.
@@ -72,7 +71,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
+        raise SystemExit(main(sys.argv))
     except Exception as exc:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
         raise

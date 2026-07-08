@@ -17,16 +17,16 @@ set -euo pipefail
 
 WORKSPACE=/workspace
 PROBE_SRC="$WORKSPACE/probe.py"
-TARGET_DIR="${TARGET_DIR:-/target}"              # sealed: root:root 0700
+TARGET_DIR="/target"                             # sealed: root:root 0700
 TARGET_SRC="$TARGET_DIR/main.py"
-SERVER="${BATTLESNAKE_SERVER:-/opt/battlesnake/server.py}"
-BATTLESNAKE="${BATTLESNAKE_BIN:-/opt/battlesnake/battlesnake}"
-PARSER="${PROBE_PARSER:-/opt/battlesnake/parse_probe_traces.py}"
+SERVER="/opt/battlesnake/server.py"
+BATTLESNAKE="/opt/battlesnake/battlesnake"
+PARSER="/opt/battlesnake/parse_probe_traces.py"
 BUDGET_FILE="$WORKSPACE/.probe_budget"
-ARENA="${PROBE_ARENA:-/run/probe_arena}"          # root-owned scratch
+ARENA="/run/probe_arena"                         # root-owned scratch
 SIMS_PER_PROBE="${SIMS_PER_PROBE:-3}"
-BOARD_W="${BOARD_W:-11}"
-BOARD_H="${BOARD_H:-11}"
+BOARD_W=11
+BOARD_H=11
 
 # --- next probe number --------------------------------------------------------
 PROBE_NUM=1

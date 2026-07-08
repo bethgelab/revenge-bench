@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import shutil
 import signal
 import socket
@@ -132,29 +133,43 @@ def _run_one_opponent(opponent: Path, opp_idx: int, sims: int, width: int, heigh
     try:
         _wait_for_ports((target_port, opponent_port), [target_log, opponent_log])
         for sim_idx in range(sims):
-            subprocess.run(
+            players = [
+                ("target", target_port),
+                ("opponent", opponent_port),
+            ]
+            random.shuffle(players)
+            cmd = [
+                str(BATTLE),
+                "play",
+            ]
+            for name, port in players:
+                cmd.extend(["--url", f"http://localhost:{port}", "-n", name])
+            out_path = opp_dir / f"sim_{sim_idx}.jsonl"
+            cmd.extend(
                 [
-                    str(BATTLE),
-                    "play",
-                    "--url",
-                    f"http://localhost:{target_port}",
-                    "-n",
-                    "target",
-                    "--url",
-                    f"http://localhost:{opponent_port}",
-                    "-n",
-                    "opponent",
                     "--width",
                     str(width),
                     "--height",
                     str(height),
                     "-o",
-                    str(opp_dir / f"sim_{sim_idx}.jsonl"),
-                ],
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                    str(out_path),
+                ]
             )
+            proc = subprocess.run(
+                cmd,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if proc.returncode != 0:
+                tail = (proc.stdout + "\n" + proc.stderr)[-4000:]
+                raise RuntimeError(
+                    f"BattleSnake simulation failed for opponent {opponent.name} "
+                    f"sim {sim_idx} with rc={proc.returncode}:\n{tail}"
+                )
+            if not out_path.exists() or out_path.stat().st_size == 0:
+                raise RuntimeError(f"BattleSnake produced empty/missing trace: {out_path}")
     finally:
         _stop(target_proc, opponent_proc)
 

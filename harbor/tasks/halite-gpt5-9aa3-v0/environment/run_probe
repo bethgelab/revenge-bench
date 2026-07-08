@@ -20,5 +20,10 @@ fi
 
 probe_id=$((25 - remaining + 1))
 echo $((remaining - 1)) > "$BUDGET_FILE"
+SIMS="${SIMS_PER_PROBE:-3}"
 
-python3 -I /opt/halite/run_probe_impl.py "$probe_id" "${SIMS_PER_PROBE:-3}"
+env -i \
+  PATH="$PATH" \
+  HOME=/root \
+  PYTHONNOUSERSITE=1 \
+  python3 -I /opt/halite/run_probe_impl.py "$probe_id" "$SIMS"

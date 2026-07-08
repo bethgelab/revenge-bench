@@ -23,7 +23,7 @@ RESOLVED_TASK = Path(os.environ.get("HALITE_RESOLVED_TASK", "/target/resolved_ta
 TRACE_SOURCE = os.environ.get("HALITE_TRACE_SOURCE", "harbor-image-build")
 
 
-def _run_one_opponent(opponent: Path, opp_idx: int, sims: int, seed: int) -> None:
+def _run_one_opponent(opponent: Path, opp_idx: int, sims: int) -> None:
     opp_dir = OUT / f"opp_{opp_idx}"
     opp_dir.mkdir(parents=True, exist_ok=True)
     print(f"generating Halite traces for opponent {opp_idx}: {opponent.name} ({sims} sims)", flush=True)
@@ -36,7 +36,7 @@ def _run_one_opponent(opponent: Path, opp_idx: int, sims: int, seed: int) -> Non
     opponent_exec = compile_submission(opponent_work / "submission")
 
     players = [("target", target_exec), ("opponent", opponent_exec)]
-    random.Random(seed + opp_idx).shuffle(players)
+    random.shuffle(players)
     target_player_index = next(i for i, (role, _) in enumerate(players) if role == "target")
     target_hlt_name = None
 
@@ -65,8 +65,6 @@ def main() -> int:
     instance = json.loads(RESOLVED_TASK.read_text())
     opponents = instance["opponents"]
     total_sims = int(instance["sims_per_round"])
-    seed = int(instance.get("seed", 0))
-
     if OUT.exists():
         shutil.rmtree(OUT)
     if ARENA.exists():
@@ -82,7 +80,7 @@ def main() -> int:
         opponent = OPPONENTS / Path(rel).name
         if not (opponent / "main.c").exists():
             raise FileNotFoundError(f"missing opponent main.c: {opponent}")
-        _run_one_opponent(opponent, opp_idx, sims, seed)
+        _run_one_opponent(opponent, opp_idx, sims)
 
     manifest = {
         "source": TRACE_SOURCE,

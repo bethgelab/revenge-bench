@@ -142,6 +142,11 @@ Required:
 - `sudo run_probe` must be the only sudoers entry needed for agent-facing
   probes. A generic Harbor agent should be able to run the task by editing the
   probe artifact and executing `sudo run_probe`.
+- Trusted probe scripts must not accept caller-controlled environment overrides
+  for sealed paths, parser binaries, scratch arenas, probe budgets, or board
+  sizes. Probe simulation counts may remain the same explicit knob as the normal
+  path, but should be passed through deliberately rather than through a broad
+  preserved environment.
 - Custom bridge agents may report or observe probe usage for telemetry, but
   they must not seed, reset, or redefine the task probe budget. Older bridge
   kwargs such as `max_probes` should be compatibility no-ops if retained.

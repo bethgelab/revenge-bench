@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -50,12 +51,15 @@ def _run_one_opponent(opponent: Path, opp_idx: int, sims: int) -> None:
     opp_dir.mkdir(parents=True, exist_ok=True)
     print(f"generating RoboCode traces for opponent {opp_idx}: {opponent.name} ({sims} sims)", flush=True)
 
-    # Keep target alias stable across the multi-opponent Harbor labels. The
-    # normal evaluator resolves a single package alias for the round.
-    _copy_bot(TARGET, "p0")
-    _copy_bot(opponent, "p1")
+    players = [("target", TARGET), ("opponent", opponent)]
+    random.shuffle(players)
+    pkg_to_agent = {}
+    for idx, (role, source) in enumerate(players):
+        pkg = f"p{idx}"
+        pkg_to_agent[pkg] = role
+        _copy_bot(source, pkg)
     battle = _write_battle_file()
-    (opp_dir / "_pkg_to_agent.json").write_text(json.dumps({"p0": "target", "p1": "opponent"}) + "\n")
+    (opp_dir / "_pkg_to_agent.json").write_text(json.dumps(pkg_to_agent) + "\n")
 
     for sim_idx in range(sims):
         record = opp_dir / f"record_{sim_idx}.xml"
@@ -114,7 +118,7 @@ def main() -> int:
     manifest = {
         "source": TRACE_SOURCE,
         "task": instance,
-        "target_identity": "p0",
+        "target_identity": "per-opponent _pkg_to_agent.json",
         "label_files": [
             p.relative_to(OUT).as_posix() for p in sorted(OUT.rglob("record_*.xml"))
         ],

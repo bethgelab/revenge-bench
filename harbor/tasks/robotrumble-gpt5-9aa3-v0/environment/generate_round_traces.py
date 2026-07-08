@@ -32,7 +32,7 @@ def _prepare_bot(src: Path, dest: Path) -> Path:
     return robot_js
 
 
-def _run_one_opponent(opponent: Path, opp_idx: int, sims: int, seed: int) -> None:
+def _run_one_opponent(opponent: Path, opp_idx: int, sims: int) -> None:
     opp_dir = OUT / f"opp_{opp_idx}"
     opp_dir.mkdir(parents=True, exist_ok=True)
     print(
@@ -45,7 +45,7 @@ def _run_one_opponent(opponent: Path, opp_idx: int, sims: int, seed: int) -> Non
     opponent_js = _prepare_bot(opponent, ARENA / f"opponent_{opp_idx}")
 
     players = [("target", target_js), ("opponent", opponent_js)]
-    random.Random(seed + opp_idx).shuffle(players)
+    random.shuffle(players)
     target_team = "Blue" if players[0][0] == "target" else "Red"
     cmd_prefix = [
         "./rumblebot",
@@ -92,7 +92,6 @@ def main() -> int:
     instance = json.loads(RESOLVED_TASK.read_text())
     opponents = instance["opponents"]
     total_sims = int(instance["sims_per_round"])
-    seed = int(instance.get("seed", 0))
 
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -107,7 +106,7 @@ def main() -> int:
         if sims <= 0:
             continue
         opponent = OPPONENTS / Path(rel).name
-        _run_one_opponent(opponent, opp_idx, sims, seed)
+        _run_one_opponent(opponent, opp_idx, sims)
 
     manifest = {
         "source": TRACE_SOURCE,

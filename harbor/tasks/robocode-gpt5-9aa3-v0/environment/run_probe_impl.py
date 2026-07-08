@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -49,7 +48,7 @@ def _copy_bot(src: Path, pkg: str) -> None:
     compile_robot_package(WORKSPACE, pkg)
 
 
-def main() -> int:
+def main(argv: list[str]) -> int:
     remaining = _budget()
     if remaining <= 0:
         print(json.dumps({"error": "probe budget exhausted"}, indent=2))
@@ -72,7 +71,7 @@ def main() -> int:
     reset_robot_database(WORKSPACE)
     battle = write_probe_battle(WORKSPACE)
 
-    sims = int(os.environ.get("SIMS_PER_PROBE", "3"))
+    sims = int(argv[1]) if len(argv) > 1 else 3
     simulations = run_probe_simulations(WORKSPACE, LOGS, sims=sims, battle=battle)
     payload = build_checked_probe_payload(simulations, probe_id)
     payload["probes_remaining"] = remaining - 1
@@ -85,7 +84,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
+        raise SystemExit(main(sys.argv))
     except Exception as exc:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
         raise
