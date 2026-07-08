@@ -53,6 +53,7 @@ var/
 wheels/
 share/python-wheels/
 harbor/jobs/
+jobs/
 *.egg-info/
 .installed.cfg
 *.egg
