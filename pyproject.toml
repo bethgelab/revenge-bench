@@ -1,19 +1,38 @@
 [build-system]
-requires = ["setuptools>=69", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "revenge-bench"
-version = "0.0.0"
+version = "0.1.0"
 description = "RevengeBench: reverse-engineering code-space policies from behavioral experiments"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
-    {name = "RevengeBench Authors"},
+    {name = "Babak Rahmani"},
+    {name = "Sebastian Dziadzio"},
+    {name = "Joschka Strüber"},
+    {name = "Sergio Hernández-Gutiérrez"},
+    {name = "Matthias Bethge"},
+]
+keywords = [
+    "benchmark",
+    "llm-agents",
+    "programming-games",
+    "reverse-engineering",
+    "policy-recovery",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "codeclash",
     "litellm",
     "mini-swe-agent>=1.17.1,<2.0",
     "portkey-ai",
@@ -30,6 +49,7 @@ dependencies = [
     "requests",
     "tqdm",
     "mcp>=1.27.0",
+    "scipy",
 ]
 
 [project.optional-dependencies]
@@ -44,16 +64,20 @@ dev = [
 ]
 aws = ["boto3"]
 
+[project.urls]
+Homepage = "https://revengebench.com"
+Repository = "https://github.com/bethgelab/revenge-bench"
+Paper = "https://arxiv.org/abs/2606.26094"
+Dataset = "https://huggingface.co/datasets/bethgelab/revengebench"
+Issues = "https://github.com/bethgelab/revenge-bench/issues"
+
 [project.scripts]
 revenge-bench = "revenge_bench.cli:main_cli"
 revenge-bench-pool-eval = "revenge_bench.scripts.run_pool_eval:main"
 
-[tool.uv.sources]
-codeclash = { path = "vendor/codeclash", editable = true }
-
 [tool.setuptools.packages.find]
-where = ["src"]
-include = ["revenge_bench*"]
+where = ["src", "vendor/codeclash"]
+include = ["revenge_bench*", "codeclash*"]
 
 [tool.setuptools.package-data]
 revenge_bench = [
@@ -61,6 +85,13 @@ revenge_bench = [
     "arenas/**/*.def",
     "arenas/**/*.js",
     "arenas/**/main_seed.py",
+    "traces/parsers/*.js",
+]
+codeclash = [
+    "arenas/**/*.Dockerfile",
+    "analysis/**/*.yaml",
+    "viewer/static/**/*",
+    "viewer/templates/**/*",
 ]
 
 [tool.pytest.ini_options]

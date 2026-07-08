@@ -1,0 +1,38 @@
+include README.md
+include LICENSE
+include .python-version
+include pyproject.toml
+include uv.lock
+
+recursive-include configs *
+recursive-include data *
+recursive-include scripts *
+recursive-include src *
+recursive-include tests *
+recursive-include vendor/codeclash/codeclash *
+include vendor/codeclash/LICENSE
+include vendor/codeclash/README.md
+include vendor/codeclash/pyproject.toml
+
+prune .git
+prune .github
+prune .venv
+prune build
+prune dist
+prune figures
+prune harbor
+prune logs
+prune logs_keep
+prune site
+prune vendor/codeclash/.git
+prune vendor/codeclash/.venv
+prune vendor/codeclash/build
+prune vendor/codeclash/dist
+prune vendor/codeclash/tests
+
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude *.egg-info
+global-exclude *.jsonl
