@@ -15,6 +15,7 @@ from typing import Any
 from revenge_bench.traces.offline_eval import (
     evaluate_robocode_submission_with_move_provider,
     find_robocode_sim_files,
+    robocode_parser_target_name_for_sim,
 )
 from revenge_bench.traces.parsers.robocode import extract_state_action_pairs
 
@@ -32,19 +33,10 @@ class RoboCodeArtifactMoveProvider:
         return action
 
 
-def _parser_target_name(labels: Path, target_name: str) -> str:
-    candidates = [labels / "_pkg_to_agent.json", *sorted(labels.glob("opp_*/_pkg_to_agent.json"))]
-    for path in candidates:
-        if path.exists():
-            pkg_to_agent = json.loads(path.read_text())
-            agent_to_pkg = {v: k for k, v in pkg_to_agent.items()}
-            return agent_to_pkg.get(target_name, target_name)
-    return target_name
-
-
-def _collect_queries(labels: Path, parser_target_name: str) -> list[dict[str, Any]]:
+def _collect_queries(labels: Path, target_name: str) -> list[dict[str, Any]]:
     queries: list[dict[str, Any]] = []
     for sim_file in find_robocode_sim_files(labels):
+        parser_target_name = robocode_parser_target_name_for_sim(sim_file, target_name)
         try:
             for target_state, _target_action in extract_state_action_pairs(
                 sim_file, parser_target_name
@@ -143,8 +135,7 @@ def evaluate(
     if not find_robocode_sim_files(labels):
         payload = {"error": f"No frozen record_*.xml traces found in {labels}"}
     else:
-        parser_target_name = _parser_target_name(labels, target_name)
-        queries = _collect_queries(labels, parser_target_name)
+        queries = _collect_queries(labels, target_name)
         actions = _run_action_artifact(
             submission=submission,
             runner=runner,
@@ -159,7 +150,6 @@ def evaluate(
             target_name=target_name,
             learner_name=learner_name,
             move_provider=provider,
-            parser_target_name=parser_target_name,
             evaluation_type="offline_artifact",
             include_diagnostics=True,
         )

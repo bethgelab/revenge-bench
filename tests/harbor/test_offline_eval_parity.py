@@ -352,6 +352,63 @@ def test_robocode_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path
     )
 
 
+def test_robocode_shared_scorer_resolves_target_alias_per_opponent(tmp_path: Path):
+    from unittest.mock import patch
+
+    from revenge_bench.traces.offline_eval import (
+        evaluate_robocode_submission_with_move_provider,
+    )
+
+    round_dir = tmp_path / "robocode" / "rounds" / "0"
+    opp0 = round_dir / "opp_0"
+    opp1 = round_dir / "opp_1"
+    opp0.mkdir(parents=True)
+    opp1.mkdir(parents=True)
+    (opp0 / "record_0.xml").write_text("<record></record>")
+    (opp1 / "record_0.xml").write_text("<record></record>")
+    (opp0 / "_pkg_to_agent.json").write_text(json.dumps({"p0": "target", "p1": "opponent"}))
+    (opp1 / "_pkg_to_agent.json").write_text(json.dumps({"p0": "opponent", "p1": "target"}))
+
+    seen: list[tuple[str, str]] = []
+
+    def fake_pairs(path, player_name):
+        seen.append((Path(path).parent.name, player_name))
+        return [
+            (
+                {"tick": 0},
+                {
+                    "velocity": 1,
+                    "turn_body": 0,
+                    "turn_gun": 0,
+                    "turn_radar": 0,
+                    "fire_power": 0,
+                },
+            )
+        ]
+
+    with patch(
+        "revenge_bench.traces.parsers.robocode.extract_state_action_pairs",
+        side_effect=fake_pairs,
+    ):
+        summary = evaluate_robocode_submission_with_move_provider(
+            round_dir=round_dir,
+            round_num=0,
+            target_name="target",
+            learner_name="learner",
+            move_provider=lambda _state: {
+                "velocity": 1,
+                "turn_body": 0,
+                "turn_gun": 0,
+                "turn_radar": 0,
+                "fire_power": 0,
+            },
+        )
+
+    assert seen == [("opp_0", "p0"), ("opp_1", "p1")]
+    assert summary["total_actions"] == 2
+    assert summary["mean_distance"] == 0.0
+
+
 def _write_robotrumble_round(round_dir: Path) -> None:
     round_dir.mkdir(parents=True, exist_ok=True)
     replay = {

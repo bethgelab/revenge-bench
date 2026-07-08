@@ -865,19 +865,7 @@ class InverseStrategyTournament(AbstractTournament):
                 "error": "Failed to load learner module (check that main.py defines a valid move() function)"
             }
 
-        # Resolve target package alias (e.g. "p0" in XML → "target" in config)
         target_name = self.target_agent.name
-        pkg_map_file = round_dir / "_pkg_to_agent.json"
-        if not pkg_map_file.exists():
-            candidates = sorted(round_dir.glob("opp_*/_pkg_to_agent.json"))
-            if candidates:
-                pkg_map_file = candidates[0]
-        if pkg_map_file.exists():
-            pkg_to_agent = json.loads(pkg_map_file.read_text())
-            agent_to_pkg = {v: k for k, v in pkg_to_agent.items()}
-            parser_target_name = agent_to_pkg.get(target_name, target_name)
-        else:
-            parser_target_name = target_name
 
         summary = evaluate_robocode_submission_with_move_provider(
             round_dir=round_dir,
@@ -885,7 +873,6 @@ class InverseStrategyTournament(AbstractTournament):
             target_name=target_name,
             learner_name=self.learner_agent.name,
             move_provider=self._query_learner,
-            parser_target_name=parser_target_name,
             evaluation_type="offline",
             logger=self.logger,
         )

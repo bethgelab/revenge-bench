@@ -37,6 +37,7 @@ __all__ = [
     "find_robocode_sim_files",
     "find_huskybench_sim_files",
     "robotrumble_target_team_for_sim",
+    "robocode_parser_target_name_for_sim",
     "resolve_submission_path",
     "load_move_function",
     "load_huskybench_bot",
@@ -122,6 +123,31 @@ def find_huskybench_sim_files(round_dir: Path) -> list[Path]:
     if not sim_files:
         sim_files = sorted(round_dir.glob("opp_*/game_log_*.json"))
     return sim_files
+
+
+def robocode_parser_target_name_for_sim(
+    sim_file: Path,
+    target_name: str,
+    *,
+    fallback_parser_target_name: str | None = None,
+) -> str:
+    """Return the RoboCode package alias assigned to *target_name* for a trace.
+
+    Normal multi-opponent runs can shuffle the target/opponent order separately
+    for each opponent.  RoboCode XML stores short package aliases (``p0``,
+    ``p1``), so the parser target must be resolved from the mapping adjacent to
+    each trace file rather than once per whole round.
+    """
+
+    for path in (sim_file.parent / "_pkg_to_agent.json", sim_file.parent.parent / "_pkg_to_agent.json"):
+        if not path.exists():
+            continue
+        pkg_to_agent = json.loads(path.read_text())
+        agent_to_pkg = {v: k for k, v in pkg_to_agent.items()}
+        return agent_to_pkg.get(
+            target_name, fallback_parser_target_name or target_name
+        )
+    return fallback_parser_target_name or target_name
 
 
 # --------------------------------------------------------------------------- #
@@ -813,7 +839,7 @@ def make_robotrumble_js_action_provider(
 def score_robocode_simulations_with_provider(
     sim_files: list[Path],
     round_dir: Path,
-    parser_target_name: str,
+    parser_target_name: str | Callable[[Path], str],
     move_provider: Callable[[dict], Any],
     *,
     logger=None,
@@ -837,6 +863,11 @@ def score_robocode_simulations_with_provider(
 
     for sim_file in sim_files:
         try:
+            parser_name = (
+                parser_target_name(sim_file)
+                if callable(parser_target_name)
+                else parser_target_name
+            )
             sim_total = 0
             sim_expected = 0
             sim_skipped_none = 0
@@ -844,7 +875,7 @@ def score_robocode_simulations_with_provider(
             sim_nonzero: list[dict] = []
 
             state_action_pairs = extract_state_action_pairs(
-                sim_file, parser_target_name
+                sim_file, parser_name
             )
             sim_expected = len(state_action_pairs)
 
@@ -903,7 +934,7 @@ def evaluate_robocode_submission_with_move_provider(
     learner_name: str,
     move_provider: Callable[[dict], Any],
     *,
-    parser_target_name: str | None = None,
+    parser_target_name: str | Callable[[Path], str] | None = None,
     evaluation_type: str = "offline",
     logger=None,
     include_diagnostics: bool = False,
@@ -913,11 +944,15 @@ def evaluate_robocode_submission_with_move_provider(
     if not sim_files:
         return {"error": f"No record_*.xml files in {round_dir}"}
 
+    parser_target = parser_target_name or (
+        lambda sim_file: robocode_parser_target_name_for_sim(sim_file, target_name)
+    )
+
     total_actions, total_distance, per_simulation, all_nonzero = (
         score_robocode_simulations_with_provider(
             sim_files,
             round_dir,
-            parser_target_name or target_name,
+            parser_target,
             move_provider,
             logger=logger,
         )
