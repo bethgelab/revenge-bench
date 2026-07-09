@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from revenge_bench.traces.offline_eval import (
+from revenge_bench.harbor.traces.offline_eval import (
     evaluate_robotrumble_submission_with_action_provider,
 )
 

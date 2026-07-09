@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, "/opt/halite")
 
 from halite_common import compile_submission, copy_workspace_submission
-from revenge_bench.traces.parsers.halite import query_compiled_bot
+from revenge_bench.harbor.traces.parsers.halite import query_compiled_bot
 
 
 def main() -> int:

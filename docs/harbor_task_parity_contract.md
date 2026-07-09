@@ -38,17 +38,18 @@ meaning of the data and score.
 
 BattleSnake is the current reference pattern.
 
-The Harbor verifier does not implement its own benchmark scoring. It supplies a
+The Harbor verifier keeps benchmark scoring in Harbor-owned code. It supplies a
 subprocess-backed learner action provider and delegates the parser, distance
-metric, aggregation, and summary construction to shared repo code in
-`revenge_bench.traces.offline_eval`.
+metric, aggregation, and summary construction to
+`revenge_bench.harbor.traces.offline_eval`.
 
 For new games, copy this architecture:
 
-1. Keep game semantics in shared `src/revenge_bench/...` code.
-2. Let Harbor scripts adapt only filesystem/process/container details.
-3. Add parity tests that compare normal path output to Harbor/shared output on
-   the same synthetic traces.
+1. Keep native benchmark code unchanged.
+2. Put Harbor scoring adapters and any duplicated parser helpers under
+   `src/revenge_bench/harbor/...`.
+3. Add parity tests that compare normal path output to Harbor output on the
+   same synthetic traces.
 
 ## Required Checks For Each Game
 
@@ -161,17 +162,17 @@ helpers and a byte-identical parity test.
 
 ### 6. Offline Evaluation
 
-This is the most important part. Harbor must not own an independent scoring
-loop.
+This is the most important part. Harbor may duplicate scoring code to avoid
+touching the native pipeline, but the duplicated behavior must be parity-tested.
 
 Required:
 
-- Shared evaluator in `revenge_bench.traces.offline_eval` or equivalent shared
-  repo code.
-- Normal tournament path calls the same evaluator.
-- Harbor verifier calls the same evaluator through an execution adapter.
-- Byte-identical parity test comparing normal path summary and Harbor/shared
-  summary on the same traces.
+- Harbor evaluator in `revenge_bench.harbor.traces.offline_eval` or equivalent
+  Harbor-owned code.
+- Normal tournament path remains unchanged.
+- Harbor verifier calls the Harbor evaluator through an execution adapter.
+- Byte-identical parity test comparing normal path summary and Harbor summary
+  on the same traces.
 
 The authoritative metric is `mean_distance`. Harbor `reward.txt` may be a
 monotone presentation transform, but it must not define a new benchmark score.

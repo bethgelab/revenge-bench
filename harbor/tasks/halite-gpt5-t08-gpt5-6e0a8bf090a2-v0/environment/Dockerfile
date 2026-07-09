@@ -58,7 +58,7 @@ COPY wheels/ /tmp/wheels/
 RUN python3 -m pip install --no-deps /tmp/wheels/revenge_bench-*.whl \
  && python3 -m pip install pyyaml tqdm zstandard \
  && rm -rf /tmp/wheels \
- && python3 -I -c "from revenge_bench.traces.parsers import halite; print('revenge_bench Halite import OK')"
+ && python3 -I -c "from revenge_bench.harbor.traces.parsers import halite; print('revenge_bench Halite import OK')"
 
 RUN mkdir -p /opt/halite /opt/revengebench /target /logs/verifier /run \
  && HLT_HEADER="$(find /workspace -name hlt.h -print -quit)" \

@@ -69,7 +69,7 @@ def test_robotrumble_probe_payload_matches_normal_path_parser_byte_identically()
     from revenge_bench.tournaments.inverse_strategy_interventionist import (
         InverseStrategyInterventionistTournament,
     )
-    from revenge_bench.traces.parsers.robotrumble import build_probe_trace_payload
+    from revenge_bench.harbor.traces.parsers.robotrumble import build_probe_trace_payload
 
     probe_id = 11
     replay_name = "sim_0.json"

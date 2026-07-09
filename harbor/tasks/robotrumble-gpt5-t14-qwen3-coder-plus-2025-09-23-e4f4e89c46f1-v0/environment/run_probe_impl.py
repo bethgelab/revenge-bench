@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from revenge_bench.traces.parsers.robotrumble import build_probe_trace_payload
+from revenge_bench.harbor.traces.parsers.robotrumble import build_probe_trace_payload
 
 
 WORKSPACE = Path("/workspace")

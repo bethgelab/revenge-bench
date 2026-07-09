@@ -1,39 +1,30 @@
-"""Drift/parity test: Harbor ``instruction.md`` is the harbor-route render of the
-shared inverse-strategy prompt templates.
-
-The Harbor inverse-strategy task text is generated from the *same* prompt
-templates the native ``inverse_codex`` learner uses, via the shared
-:func:`revenge_bench.agents.utils.render_prompt_sections`, selecting the
-``route="harbor"`` branch. This test guards three things:
+"""Drift test: Harbor ``instruction.md`` matches Harbor-owned prompt templates.
 
 1. **Drift** — the committed ``harbor/tasks/<task>/instruction.md``
    equals a fresh :func:`render_task_instruction`. If someone edits the prompt
-   YAML (or the instruction) without regenerating, this fails, exactly like the
-   ``offline_eval`` byte-identity guard.
-2. **Provenance** — the render is produced by the same section-rendering helper
-   the native ``_render_round_prompt`` calls, over a real ``GameContext`` built
-   from the same ``configs/prompts/codex`` sources, so the Harbor instruction
-   cannot silently diverge from the shared prompt content.
-3. **Route branch** — the shared templates branch on ``route``: the codex loop
-   (multi-round, ``/logs/rounds`` traces, MCP ``run_probe``) for ``codex`` vs the
-   single-session Harbor mechanics (``sudo run_probe``, ``/workspace``,
-   ``probe_trace_*.json``) for ``harbor``, with the game description + scorer
-   core identical across both.
+   YAML (or the instruction) without regenerating, this fails.
+2. **Isolation** — Harbor renders from ``revenge_bench/harbor/prompts`` and a
+   local renderer, so native ``configs/prompts/codex`` and agent code stay
+   main-pipeline-owned.
+3. **Route branch** — the Harbor templates still distinguish the codex-like
+   loop language from the single-session Harbor mechanics.
 """
 
 from __future__ import annotations
 
 import yaml
+from jinja2 import StrictUndefined, Template
 
-from revenge_bench.agents.utils import GameContext, render_prompt_sections
+from revenge_bench.agents.utils import GameContext
 from revenge_bench.harbor.prompt import (
-    CODEX_SYSTEM_PROMPT,
     HARBOR_TASK_GAMES,
+    HARBOR_SYSTEM_PROMPT,
     instruction_path,
     render_codex_instruction,
+    render_prompt_sections,
     render_task_instruction,
 )
-from revenge_bench.paths import CONFIG_DIR
+from revenge_bench.harbor.prompt import HARBOR_GAME_PROMPT_DIR
 
 
 def test_committed_instruction_is_not_stale():
@@ -47,35 +38,30 @@ def test_committed_instruction_is_not_stale():
         )
 
 
-def test_render_matches_native_section_rendering():
-    """The Harbor render equals the shared section rendering on the harbor route.
-
-    Rebuilds the render the way ``_render_round_prompt`` does — the same
-    ``render_prompt_sections`` over the same ``config.agent`` templates and a
-    real ``GameContext.to_template_vars()`` — but with ``route="harbor"``, and
-    asserts equality with the Harbor helper's output. This proves the Harbor
-    instruction is produced by the shared renderer over a real ``GameContext``
-    (same provenance as the native path), differing only by the ``route`` flag.
-    """
+def test_render_matches_harbor_section_rendering():
+    """The Harbor render equals direct rendering of Harbor-owned templates."""
     game = HARBOR_TASK_GAMES["battlesnake-gpt5-9aa3-v0"]
-    agent_cfg = yaml.safe_load(CODEX_SYSTEM_PROMPT.read_text())
-    prompts = yaml.safe_load(
-        (CONFIG_DIR / "prompts" / "codex" / "games" / f"{game}.yaml").read_text()
-    )
+    agent_cfg = yaml.safe_load(HARBOR_SYSTEM_PROMPT.read_text())
+    prompts = yaml.safe_load((HARBOR_GAME_PROMPT_DIR / f"{game}.yaml").read_text())
     gc = GameContext(
         id=game,
         log_env="/logs",
         log_local="/logs",
         name="learner",
         player_id="learner",
-        prompts=prompts,
+        prompts={},
         round=1,
         rounds=1,
         working_dir="/workspace",
         context_mode="persistent",
-        route="harbor",
     )
-    expected = "\n\n".join(render_prompt_sections(agent_cfg, gc.to_template_vars())) + "\n"
+    template_vars = gc.to_template_vars()
+    template_vars["route"] = "harbor"
+    for key, raw in prompts.items():
+        template_vars[key] = Template(str(raw), undefined=StrictUndefined).render(
+            **template_vars
+        )
+    expected = "\n\n".join(render_prompt_sections(agent_cfg, template_vars)) + "\n"
 
     assert render_codex_instruction(game) == expected
 

@@ -19,22 +19,18 @@ game_description: |
   See `runGame.sh` under `submission/<language>/` for compile/run instructions.
 
   ## How It Works (IMPORTANT)
-  {% if route == "harbor" %}You work in ONE container session (no rounds):
-  1. You PROBE the sealed target to test hypotheses about its behavior
-  2. You EDIT your submission based on probe results + visible traces
-  3. When you finish, your submission is evaluated OFFLINE against fresh target-vs-opponent games generated after your work session — accuracy = how often your action matches the target's
-  {% else %}Each round:
+  Each round:
   1. You PROBE first to test hypotheses about the target
   2. You EDIT your submission based on probe results + traces
   3. At round end, main simulation runs: target vs MULTIPLE opponents
   4. You get traces showing target's actions against different opponents
-  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect){% endif %}
+  5. Your code is evaluated by action distance against target (lower = better, 0 = perfect)
 
   ## Multi-Opponent Advantage
 
   Each round the target plays against MULTIPLE different opponents. This gives
   you **richer data** — you see how the target behaves in diverse game situations
-  within a single {% if route == "harbor" %}task session{% else %}round{% endif %}.
+  within a single round.
 
   **The target's strategy is FIXED and never changes.** Different opponents
   create different board states, but the target's decision rules are constant.
@@ -53,11 +49,11 @@ game_description: |
   understanding the target. Traces only show what happened — probes let you
   run controlled experiments.
 
-  **Recommended workflow {% if route == "harbor" %}for this session{% else %}each round{% endif %}:**
-  1. Read {% if route == "harbor" %}`rounds/0/traces.json`{% else %}traces.json{% endif %} — identify mismatches
+  **Recommended workflow each round:**
+  1. Read traces.json — identify mismatches
   2. Form a hypothesis (e.g., "target prioritizes expansion over consolidation")
   3. Design a probe to elicit specific behavior from the target (edit files in `probe/` to create that scenario)
-  4. {% if route == "harbor" %}Run `sudo run_probe` and analyze `probe_trace_{N}.json`{% else %}Call the `run_probe` MCP tool and analyze results{% endif %}
+  4. Call the `run_probe` MCP tool and analyze results
   5. Run 1-2 more probes to refine understanding
   6. THEN edit your submission based on confirmed hypotheses
 
@@ -68,16 +64,15 @@ game_description: |
 
   You can run probe simulations AT ANY TIME during editing!
 
-  {% if route == "harbor" %}`probe/` starts as a copy of `submission/`.
-  You just need to modify files in it to create the test scenario you want, then run `sudo run_probe`.{% else %}`probe/` is automatically seeded from your current `submission/` at the start of each round.
-  You just need to modify files in it to create the test scenario you want, then call the `run_probe` MCP tool.{% endif %}
+  `probe/` is automatically seeded from your current `submission/` at the start of each round.
+  You just need to modify files in it to create the test scenario you want, then call the `run_probe` MCP tool.
 
   ### How to Probe
   1. Edit `probe/main.<ext>` implementing a strategy that will elicit the behavior you want to test
-  2. {% if route == "harbor" %}Run `sudo run_probe`{% else %}Call the `run_probe` MCP tool{% endif %} — the system will play your probe against the target
-  3. {% if route == "harbor" %}Read `/workspace/probe_trace_{N}.json`{% else %}Read the results{% endif %} to see what the target did in the situations your probe created
+  2. Call the `run_probe` MCP tool — the system will play your probe against the target
+  3. Read the results to see what the target did in the situations your probe created
 
-  {% if route == "harbor" %}You have a bounded probe budget (see `/workspace/.probe_budget`; it decrements on each probe).{% else %}You get up to 5 probes per round. **Aim to use at least 2 per round.**{% endif %}
+  You get up to 5 probes per round. **Aim to use at least 2 per round.**
 
   ### CRITICAL: Separate Exploration from Exploitation
 
@@ -99,7 +94,7 @@ game_description: |
 
   ### Probe Output Format
   After each probe, results are written to a JSON file in your workspace:
-  {% if route == "harbor" %}`probe_trace_{N}.json`{% else %}`probe_trace_r{round}_p{probe_num}.json`{% endif %}
+  `probe_trace_r{round}_p{probe_num}.json`
 
   ```json
   {
@@ -132,12 +127,10 @@ game_description: |
 
   ## Key Files
   - `submission/` - Your recovered policy (EDIT THIS — evaluated by action distance). **Only edit after probing.**
-  - `probe/` - Your experiment instrument (copy of `submission/`). **Must differ from submission.** {% if route == "harbor" %}Starts as a submission copy.{% else %}Auto-seeded each round.{% endif %}
+  - `probe/` - Your experiment instrument (copy of `submission/`). **Must differ from submission.** Auto-seeded each round.
   - `docs/` - Game documentation and API reference
-  {% if route == "harbor" %}- `rounds/0/traces.json` - Initial normal-path-style distance summary and target-action mismatches for the starter bot
-  - `rounds/0/opp_*/sim_*.hlt` - Visible prior target-vs-opponent Halite replays
-  - `/workspace/probe_trace_{N}.json` - Results from your probes{% else %}- `/logs/rounds/{N}/traces.json` - Distance results and nonzero_distances
-  - `/logs/rounds/{N}/*.hlt` - Raw game replays (target vs MULTIPLE opponents){% endif %}
+  - `/logs/rounds/{N}/traces.json` - Distance results and nonzero_distances
+  - `/logs/rounds/{N}/*.hlt` - Raw game replays (target vs MULTIPLE opponents)
 
 
   ## Tips

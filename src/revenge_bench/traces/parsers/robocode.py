@@ -543,62 +543,6 @@ def extract_state_action_pairs(
     return pairs
 
 
-def build_probe_trace_payload(
-    simulations: list[tuple[str, Path]],
-    probe_id: int,
-    *,
-    probe_player: str = "p0",
-    target_player: str = "p1",
-) -> dict[str, Any]:
-    """Build normal-path RoboCode probe output from XML recording files."""
-    all_pairs: list[dict[str, Any]] = []
-    per_simulation: list[dict[str, Any]] = []
-
-    for filename, xml_file in simulations:
-        target_pairs = extract_state_action_pairs(xml_file, target_player)
-        probe_pairs = extract_state_action_pairs(xml_file, probe_player)
-
-        target_by_tick = {
-            state.get("tick", i): (state, action)
-            for i, (state, action) in enumerate(target_pairs)
-        }
-        probe_by_tick = {
-            state.get("tick", i): (state, action)
-            for i, (state, action) in enumerate(probe_pairs)
-        }
-
-        sim_pairs = []
-        for tick in sorted(set(target_by_tick) & set(probe_by_tick)):
-            target_state, target_action = target_by_tick[tick]
-            _, probe_action = probe_by_tick[tick]
-            distance = actions_distance(probe_action, target_action)
-            pair = {
-                "turn": tick,
-                "probe_action": probe_action,
-                "target_action": target_action,
-                "distance": round(distance, 4),
-                "target_state": target_state,
-            }
-            sim_pairs.append(pair)
-            all_pairs.append(pair)
-
-        per_simulation.append(
-            {
-                "file": filename,
-                "num_turns": len(sim_pairs),
-            }
-        )
-
-    return {
-        "probe_id": probe_id,
-        "description": "probe (p0) vs target (p1) — action comparison per tick",
-        "total_turns": len(all_pairs),
-        "num_simulations": len(per_simulation),
-        "per_simulation": per_simulation,
-        "pairs": all_pairs,
-    }
-
-
 # =============================================================================
 # Trace Parser
 # =============================================================================

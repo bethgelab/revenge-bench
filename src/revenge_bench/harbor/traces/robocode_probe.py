@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from revenge_bench.traces.parsers.robocode import build_probe_trace_payload
+from revenge_bench.harbor.traces.parsers.robocode import build_probe_trace_payload
 
 
 RC_FILE = Path("MyTank.java")

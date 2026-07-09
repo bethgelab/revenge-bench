@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from huskybench_common import run_husky_game
-from revenge_bench.traces.parsers.huskybench import build_probe_trace_payload
+from revenge_bench.harbor.traces.parsers.huskybench import build_probe_trace_payload
 
 
 WORKSPACE = Path("/workspace")

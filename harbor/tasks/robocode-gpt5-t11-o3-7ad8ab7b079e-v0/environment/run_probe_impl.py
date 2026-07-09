@@ -8,7 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from revenge_bench.traces.robocode_probe import (
+from revenge_bench.harbor.traces.robocode_probe import (
     RC_FILE,
     build_checked_probe_payload,
     compile_robot_package,

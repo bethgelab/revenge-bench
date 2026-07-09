@@ -601,12 +601,15 @@ class InverseStrategyTournament(AbstractTournament):
         BattleSnake bots export a move(state) function that returns a direction string.
         Sim files are JSONL with one JSON object per turn.
         """
-        from revenge_bench.traces.offline_eval import (
-            find_battlesnake_sim_files,
-            score_battlesnake_simulations,
+        from revenge_bench.traces.parsers.battlesnake import (
+            actions_distance,
+            extract_state_action_pairs,
         )
 
-        sim_files = find_battlesnake_sim_files(round_dir)
+        sim_files = sorted(round_dir.glob("sim_*.jsonl"))
+        if not sim_files:
+            # Multi-opponent layout: opp_*/sim_*.jsonl
+            sim_files = sorted(round_dir.glob("opp_*/sim_*.jsonl"))
         if not sim_files:
             self.logger.warning(f"No sim_*.jsonl files in {round_dir}")
             return None
@@ -618,17 +621,62 @@ class InverseStrategyTournament(AbstractTournament):
                 "error": "Failed to load learner module (check that main.py defines a valid move() function)"
             }
 
+        total_actions = 0
+        total_distance = 0.0
+        per_simulation = []
+        all_nonzero = []
         target_name = self.target_agent.name
 
-        total_actions, total_distance, per_simulation, all_nonzero = (
-            score_battlesnake_simulations(
-                sim_files,
-                round_dir,
-                target_name,
-                self._learner_move_func,
-                logger=self.logger,
-            )
-        )
+        for sim_file in sim_files:
+            try:
+                sim_total = 0
+                sim_distance = 0.0
+                sim_nonzero = []
+
+                state_action_pairs = extract_state_action_pairs(sim_file, target_name)
+
+                for turn_idx, (target_state, target_action) in enumerate(
+                    state_action_pairs
+                ):
+                    learner_action = self._query_learner(target_state)
+                    if learner_action is None:
+                        continue
+
+                    sim_total += 1
+                    distance = actions_distance(learner_action, target_action)
+                    sim_distance += distance
+
+                    if distance > 0.0:
+                        entry = {
+                            "sim_file": str(sim_file.relative_to(round_dir)),
+                            "turn": target_state.get("turn", turn_idx),
+                            "learner_action": learner_action,
+                            "target_action": target_action,
+                            "distance": distance,
+                            "state": target_state,
+                        }
+                        sim_nonzero.append(entry)
+                        all_nonzero.append(entry)
+
+                total_actions += sim_total
+                total_distance += sim_distance
+                per_simulation.append(
+                    {
+                        "file": str(sim_file.relative_to(round_dir)),
+                        "total": sim_total,
+                        "distance_sum": sim_distance,
+                        "mean_distance": sim_distance / sim_total
+                        if sim_total > 0
+                        else 0.0,
+                        "num_nonzero": len(sim_nonzero),
+                    }
+                )
+            except Exception as e:
+                self.logger.warning(f"Error processing {sim_file}: {e}")
+                import traceback
+
+                traceback.print_exc()
+                continue
 
         return self._build_trace_summary(
             round_num,
@@ -652,13 +700,16 @@ class InverseStrategyTournament(AbstractTournament):
         (one JSON line per turn).  This mirrors how the real RobotRumble
         engine invokes the learner — fully in JavaScript.
         """
-        from revenge_bench.traces.offline_eval import (
-            evaluate_robotrumble_submission_with_action_provider,
-            find_robotrumble_sim_files,
-            make_robotrumble_js_action_provider,
+        from revenge_bench.traces.parsers.robotrumble import (
+            actions_distance,
+            extract_state_action_pairs,
         )
 
-        if not find_robotrumble_sim_files(round_dir):
+        sim_files = sorted(round_dir.glob("sim_*.json"))
+        if not sim_files:
+            # Multi-opponent layout: opp_*/sim_*.json
+            sim_files = sorted(round_dir.glob("opp_*/sim_*.json"))
+        if not sim_files:
             self.logger.warning(f"No sim_*.json files in {round_dir}")
             return None
 
@@ -677,22 +728,140 @@ class InverseStrategyTournament(AbstractTournament):
             self.logger.warning(f"robot.js not found in {learner_code_dir}")
             return {"error": "robot.js not found in learner workspace"}
 
-        result = evaluate_robotrumble_submission_with_action_provider(
-            round_dir=round_dir,
-            round_num=round_num,
-            learner_name=self.learner_agent.name,
-            action_provider=make_robotrumble_js_action_provider(robot_js, timeout=120),
-            fallback_target_team=getattr(self, "_rr_target_team", "Blue"),
-            logger=self.logger,
-            evaluation_type="offline",
-        )
-        if result.get("error") == "No state-action pairs extracted from sim files":
+        # ── harness / stdlib paths (shipped with codeclash) ──────────
+        parsers_dir = Path(__file__).resolve().parent.parent / "traces" / "parsers"
+        harness_js = parsers_dir / "robotrumble_eval_harness.js"
+        stdlib_js = parsers_dir / "robotrumble_stdlib.js"
+        lodash_js = parsers_dir / "robotrumble_lodash.min.js"
+
+        # ── team assignment ──────────────────────────────────────────
+        # Determine per-sim-file which team the target was assigned to.
+        # run_round shuffles game_agents in-place so [0]=Blue, [1]=Red.
+        # For multi-opponent runs, each opp_X/ has a _target_team.txt
+        # written right after its run_round call (before the next shuffle).
+        # For single-opponent runs, self._rr_target_team is set in
+        # run_simulation_phase right after run_round.
+        def _target_team_for(sim_path: Path) -> str:
+            # Check for per-opponent metadata first (multi-opponent layout)
+            team_file = sim_path.parent / "_target_team.txt"
+            if team_file.exists():
+                return team_file.read_text().strip()
+            # Fall back to single-opponent attribute
+            return getattr(self, "_rr_target_team", "Blue")
+
+        # ── collect all (sim_file, turn_idx, state, target_action) ───
+        work_items: list[tuple[Path, int, dict, list[dict]]] = []
+        for sim_file in sim_files:
+            parser_target_name = _target_team_for(sim_file)
+            self.logger.debug(
+                f"RobotRumble target team for {sim_file.name}: {parser_target_name}"
+            )
+            try:
+                for turn_idx, (target_state, target_action) in enumerate(
+                    extract_state_action_pairs(sim_file, parser_target_name)
+                ):
+                    work_items.append((sim_file, turn_idx, target_state, target_action))
+            except Exception as e:
+                self.logger.warning(f"Error parsing {sim_file}: {e}")
+
+        if not work_items:
             self.logger.warning("No state-action pairs extracted from sim files")
             return None
-        traces_file = round_dir / "traces.json"
-        traces_file.write_text(json.dumps(result, indent=2))
-        self.logger.info(f"Saved RobotRumble trace summary to {traces_file}")
-        return result
+
+        # ── build JSONL payload for the harness ──────────────────────
+        input_lines: list[str] = []
+        for _, _, state, _ in work_items:
+            harness_input = {
+                "state": {"objs": state["all_objs"], "turn": state.get("turn", 0)},
+                "team": state["team"],
+            }
+            input_lines.append(json.dumps(harness_input, separators=(",", ":")))
+        payload = "\n".join(input_lines) + "\n"
+
+        # ── run JS evaluation (docker or singularity, runtime-aware) ─
+        from revenge_bench.utils.js_eval import run_js_eval
+
+        result = run_js_eval(
+            harness_js, stdlib_js, lodash_js, robot_js,
+            payload=payload, timeout=120,
+        )
+        if result.returncode != 0:
+            self.logger.warning(
+                f"JS eval failed (rc={result.returncode}): "
+                f"{(result.error or '')[:500]}"
+            )
+            return {"error": f"JS evaluation failed: {(result.error or '')[:200]}"}
+
+        output_lines = [l for l in result.stdout.strip().split("\n") if l.strip()]
+        if len(output_lines) != len(work_items):
+            self.logger.warning(
+                f"JS eval output mismatch: got {len(output_lines)} lines for {len(work_items)} states"
+            )
+            return {"error": "JS eval output line count mismatch"}
+
+        # ── compare learner actions with target ──────────────────────
+        total_actions = 0
+        total_distance = 0.0
+        per_simulation: list[dict] = []
+        all_nonzero: list[dict] = []
+
+        # Group by sim file to build per_simulation stats
+
+        sim_groups: dict[str, list[tuple[int, dict, list[dict], list[dict]]]] = {}
+        for idx, (sim_file, turn_idx, target_state, target_action) in enumerate(
+            work_items
+        ):
+            learner_action = json.loads(output_lines[idx])
+            sim_key = str(sim_file.relative_to(round_dir))
+            sim_groups.setdefault(sim_key, []).append(
+                (turn_idx, target_state, target_action, learner_action)
+            )
+
+        for sim_key, items in sim_groups.items():
+            sim_total = 0
+            sim_distance = 0.0
+            sim_nonzero: list[dict] = []
+
+            for turn_idx, target_state, target_action, learner_action in items:
+                sim_total += 1
+                distance = actions_distance(learner_action, target_action)
+                sim_distance += distance
+
+                if distance > 0.0:
+                    entry = {
+                        "sim_file": Path(sim_key).name,
+                        "turn": target_state.get("turn", turn_idx),
+                        "learner_action": learner_action,
+                        "target_action": target_action,
+                        "distance": distance,
+                        "state": target_state,
+                    }
+                    sim_nonzero.append(entry)
+                    all_nonzero.append(entry)
+
+            total_actions += sim_total
+            total_distance += sim_distance
+            per_simulation.append(
+                {
+                    "file": sim_key,
+                    "total": sim_total,
+                    "distance_sum": sim_distance,
+                    "mean_distance": sim_distance / sim_total if sim_total > 0 else 0.0,
+                    "num_nonzero": len(sim_nonzero),
+                }
+            )
+
+        return self._build_trace_summary(
+            round_num,
+            "RobotRumble",
+            parser_target_name,
+            "offline",
+            total_actions,
+            total_distance,
+            per_simulation,
+            all_nonzero,
+            round_dir,
+        )
 
     def _process_halite_traces(
         self, round_dir: Path, round_num: int
@@ -705,13 +874,17 @@ class InverseStrategyTournament(AbstractTournament):
            via subprocess and collects its moves
         3. Compares learner's moves against target's recorded moves
         """
-        from revenge_bench.traces.offline_eval import (
-            evaluate_halite_submission_with_action_provider,
-            find_halite_sim_files,
+        from revenge_bench.traces.parsers.halite import (
+            actions_distance,
+            extract_state_action_pairs,
+            load_hlt_file,
+            query_compiled_bot,
         )
-        from revenge_bench.traces.parsers.halite import query_compiled_bot
 
-        if not find_halite_sim_files(round_dir):
+        sim_files = sorted(round_dir.glob("*.hlt"))
+        if not sim_files:
+            sim_files = sorted(round_dir.glob("opp_*/*.hlt"))
+        if not sim_files:
             self.logger.warning(f"No .hlt files in {round_dir}")
             return None
 
@@ -731,25 +904,87 @@ class InverseStrategyTournament(AbstractTournament):
             }
         self.logger.info(f"Using target bot name: {target_hlt_name}")
 
-        summary = evaluate_halite_submission_with_action_provider(
-            round_dir=round_dir,
-            round_num=round_num,
-            target_hlt_name=target_hlt_name,
-            learner_name=self.learner_agent.name,
-            action_provider=lambda hlt_data, player_tag: query_compiled_bot(
-                learner_executable,
-                hlt_data,
-                player_tag,
-                timeout=10.0,
-            ),
-            logger=self.logger,
-            evaluation_type="offline_subprocess",
-        )
+        total_actions = 0
+        total_distance = 0.0
+        per_simulation = []
+        all_nonzero = []
 
-        traces_file = round_dir / "traces.json"
-        traces_file.write_text(json.dumps(summary, indent=2))
-        self.logger.info(f"Saved Halite trace summary to {traces_file}")
-        return summary
+        for sim_file in sim_files:
+            try:
+                sim_total = 0
+                sim_distance = 0.0
+                sim_nonzero = []
+
+                state_action_pairs = extract_state_action_pairs(
+                    sim_file, target_hlt_name
+                )
+
+                # Batch query: feed all frames via subprocess at once
+                hlt_data = load_hlt_file(sim_file)
+                player_tag = hlt_data["player_names"].index(target_hlt_name) + 1
+                learner_actions = query_compiled_bot(
+                    learner_executable,
+                    hlt_data,
+                    player_tag,
+                    timeout=10.0,
+                )
+
+                for turn_idx, (target_state, target_action) in enumerate(
+                    state_action_pairs
+                ):
+                    learner_action = (
+                        learner_actions[turn_idx]
+                        if turn_idx < len(learner_actions)
+                        else []
+                    )
+
+                    sim_total += 1
+                    distance = actions_distance(learner_action, target_action)
+                    sim_distance += distance
+
+                    if distance > 0.0:
+                        entry = {
+                            "sim_file": str(sim_file.relative_to(round_dir)),
+                            "turn": target_state.get("turn", turn_idx),
+                            "learner_action": learner_action,
+                            "target_action": target_action,
+                            "distance": distance,
+                            "state": target_state,
+                        }
+                        sim_nonzero.append(entry)
+                        all_nonzero.append(entry)
+
+                total_actions += sim_total
+                total_distance += sim_distance
+                per_simulation.append(
+                    {
+                        "file": str(sim_file.relative_to(round_dir)),
+                        "total": sim_total,
+                        "distance_sum": sim_distance,
+                        "mean_distance": sim_distance / sim_total
+                        if sim_total > 0
+                        else 0.0,
+                        "num_nonzero": len(sim_nonzero),
+                    }
+                )
+            except Exception as e:
+                self.logger.warning(f"Error processing {sim_file}: {e}")
+                import traceback
+
+                traceback.print_exc()
+                continue
+
+        return self._build_trace_summary(
+            round_num,
+            "Halite",
+            target_hlt_name,
+            "offline_subprocess",
+            total_actions,
+            total_distance,
+            per_simulation,
+            all_nonzero,
+            round_dir,
+        )
 
     def _process_halite3_traces(
         self, round_dir: Path, round_num: int
@@ -847,17 +1082,30 @@ class InverseStrategyTournament(AbstractTournament):
     def _process_robocode_traces(
         self, round_dir: Path, round_num: int
     ) -> dict[str, Any] | None:
-        """Offline evaluation for RoboCode via the shared scorer."""
-        from revenge_bench.traces.offline_eval import (
-            evaluate_robocode_submission_with_move_provider,
-            find_robocode_sim_files,
+        """Offline evaluation for RoboCode.
+
+        The learner writes a Python ``move(state) → action`` function that
+        receives the game state dict and returns a 5-component action dict
+        (velocity, turn_body, turn_gun, turn_radar, fire_power).
+
+        For each state the target saw, we call the learner's ``move()`` and
+        compare the returned action with what the target actually did (inferred
+        from consecutive XML frames).
+        """
+        from revenge_bench.traces.parsers.robocode import (
+            actions_distance,
+            extract_state_action_pairs,
         )
 
-        sim_files = find_robocode_sim_files(round_dir)
+        sim_files = sorted(round_dir.glob("record_*.xml"))
+        if not sim_files:
+            # Multi-opponent layout: opp_*/record_*.xml
+            sim_files = sorted(round_dir.glob("opp_*/record_*.xml"))
         if not sim_files:
             self.logger.warning(f"No record_*.xml files in {round_dir}")
             return None
 
+        # Setup: Copy learner code to host and load module
         learner_code_dir = self._setup_learner_for_eval(round_dir)
         if learner_code_dir is None or not self._load_learner_module(learner_code_dir):
             self.logger.warning("Failed to setup learner for RoboCode evaluation")
@@ -865,21 +1113,89 @@ class InverseStrategyTournament(AbstractTournament):
                 "error": "Failed to load learner module (check that main.py defines a valid move() function)"
             }
 
+        # Resolve target package alias (e.g. "p0" in XML → "target" in config)
         target_name = self.target_agent.name
+        pkg_map_file = round_dir / "_pkg_to_agent.json"
+        if not pkg_map_file.exists():
+            candidates = sorted(round_dir.glob("opp_*/_pkg_to_agent.json"))
+            if candidates:
+                pkg_map_file = candidates[0]
+        if pkg_map_file.exists():
+            pkg_to_agent = json.loads(pkg_map_file.read_text())
+            agent_to_pkg = {v: k for k, v in pkg_to_agent.items()}
+            parser_target_name = agent_to_pkg.get(target_name, target_name)
+        else:
+            parser_target_name = target_name
 
-        summary = evaluate_robocode_submission_with_move_provider(
-            round_dir=round_dir,
-            round_num=round_num,
-            target_name=target_name,
-            learner_name=self.learner_agent.name,
-            move_provider=self._query_learner,
-            evaluation_type="offline",
-            logger=self.logger,
+        total_actions = 0
+        total_distance = 0.0
+        per_simulation: list[dict] = []
+        all_nonzero: list[dict] = []
+
+        for sim_file in sim_files:
+            try:
+                sim_total = 0
+                sim_distance = 0.0
+                sim_nonzero: list[dict] = []
+
+                state_action_pairs = extract_state_action_pairs(
+                    sim_file, parser_target_name
+                )
+
+                for turn_idx, (target_state, target_action) in enumerate(
+                    state_action_pairs
+                ):
+                    learner_action = self._query_learner(target_state)
+                    if learner_action is None:
+                        continue
+
+                    sim_total += 1
+                    distance = actions_distance(learner_action, target_action)
+                    sim_distance += distance
+
+                    if distance > 0.0:
+                        entry = {
+                            "sim_file": str(sim_file.relative_to(round_dir)),
+                            "turn": target_state.get("turn", turn_idx),
+                            "learner_action": learner_action,
+                            "target_action": target_action,
+                            "distance": distance,
+                            "state": target_state,
+                        }
+                        sim_nonzero.append(entry)
+                        all_nonzero.append(entry)
+
+                total_actions += sim_total
+                total_distance += sim_distance
+                per_simulation.append(
+                    {
+                        "file": str(sim_file.relative_to(round_dir)),
+                        "total": sim_total,
+                        "distance_sum": sim_distance,
+                        "mean_distance": sim_distance / sim_total
+                        if sim_total > 0
+                        else 0.0,
+                        "num_nonzero": len(sim_nonzero),
+                    }
+                )
+            except Exception as e:
+                self.logger.warning(f"Error processing {sim_file}: {e}")
+                import traceback
+
+                traceback.print_exc()
+                continue
+
+        return self._build_trace_summary(
+            round_num,
+            "RoboCode",
+            target_name,
+            "offline",
+            total_actions,
+            total_distance,
+            per_simulation,
+            all_nonzero,
+            round_dir,
         )
-        traces_file = round_dir / "traces.json"
-        traces_file.write_text(json.dumps(summary, indent=2))
-        self.logger.info(f"Saved RoboCode trace summary to {traces_file}")
-        return summary
 
     def _build_trace_summary(
         self,
@@ -894,19 +1210,53 @@ class InverseStrategyTournament(AbstractTournament):
         round_dir: Path,
     ) -> dict[str, Any]:
         """Compute statistics and save traces.json. Shared by all game-specific eval methods."""
-        from revenge_bench.traces.offline_eval import build_trace_summary
-
-        summary = build_trace_summary(
-            round_num,
-            game_name,
-            self.learner_agent.name,
-            target_name,
-            evaluation_type,
-            total_actions,
-            total_distance,
-            per_simulation,
-            all_nonzero,
+        mean_distance = (
+            total_distance / total_actions if total_actions > 0 else float("inf")
         )
+
+        sim_mean_distances = [
+            s["mean_distance"] for s in per_simulation if s["total"] > 0
+        ]
+        if sim_mean_distances:
+            import statistics
+
+            mean_distance_across_sims = statistics.mean(sim_mean_distances)
+            distance_std = (
+                statistics.stdev(sim_mean_distances)
+                if len(sim_mean_distances) > 1
+                else 0.0
+            )
+            distance_se = distance_std / (len(sim_mean_distances) ** 0.5)
+        else:
+            mean_distance_across_sims = float("inf")
+            distance_std = 0.0
+            distance_se = 0.0
+
+        summary = {
+            "round": round_num,
+            "game": game_name,
+            "learner": self.learner_agent.name,
+            "target": target_name,
+            "evaluation_type": evaluation_type,
+            "total_actions": total_actions,
+            "total_distance": total_distance,
+            "mean_distance": mean_distance,
+            "mean_distance_across_sims": mean_distance_across_sims,
+            "distance_std": distance_std,
+            "distance_se": distance_se,
+            "num_simulations": len(per_simulation),
+            "per_simulation": per_simulation,
+        }
+
+        # Per-component error breakdown (RoboCode: 5-component actions)
+        if all_nonzero and isinstance(all_nonzero[0].get("learner_action"), dict):
+            component_errors = self._compute_component_errors(
+                all_nonzero, total_actions
+            )
+            if component_errors:
+                summary["component_errors"] = component_errors
+
+        summary["nonzero_distances"] = all_nonzero
 
         traces_file = round_dir / "traces.json"
         traces_file.write_text(json.dumps(summary, indent=2))
@@ -922,9 +1272,56 @@ class InverseStrategyTournament(AbstractTournament):
         Returns a dict mapping component name to error stats, plus which
         components contribute the most overall error.
         """
-        from revenge_bench.traces.offline_eval import compute_component_errors
+        try:
+            from revenge_bench.traces.parsers.robocode import (
+                ACTION_COMPONENTS,
+                ACTION_RANGES,
+            )
+        except ImportError:
+            return None
 
-        return compute_component_errors(all_nonzero, total_actions)
+        # Accumulate per-component absolute errors
+        comp_sums: dict[str, float] = {c: 0.0 for c in ACTION_COMPONENTS}
+        comp_counts: dict[str, int] = {c: 0 for c in ACTION_COMPONENTS}
+        comp_max: dict[str, float] = {c: 0.0 for c in ACTION_COMPONENTS}
+
+        for entry in all_nonzero:
+            la = entry.get("learner_action", {})
+            ta = entry.get("target_action", {})
+            for comp in ACTION_COMPONENTS:
+                lv = la.get(comp, 0.0)
+                tv = ta.get(comp, 0.0)
+                rng = ACTION_RANGES[comp]
+                max_diff = rng if comp == "fire_power" else 2.0 * rng
+                normed = min(abs(lv - tv) / max_diff, 1.0)
+                comp_sums[comp] += normed
+                if normed > 0:
+                    comp_counts[comp] += 1
+                if normed > comp_max[comp]:
+                    comp_max[comp] = normed
+
+        result = {}
+        for comp in ACTION_COMPONENTS:
+            rng = ACTION_RANGES[comp]
+            max_diff = rng if comp == "fire_power" else 2.0 * rng
+            mean_err = comp_sums[comp] / total_actions if total_actions > 0 else 0.0
+            result[comp] = {
+                "mean_normalized_error": round(mean_err, 6),
+                "nonzero_count": comp_counts[comp],
+                "max_normalized_error": round(comp_max[comp], 6),
+                "range": f"[{-rng if comp != 'fire_power' else 0}, {rng}]",
+                "max_abs_diff": max_diff,
+            }
+
+        # Rank by contribution to overall error
+        ranked = sorted(
+            ACTION_COMPONENTS,
+            key=lambda c: result[c]["mean_normalized_error"],
+            reverse=True,
+        )
+        result["worst_to_best"] = ranked
+
+        return result
 
     def _setup_learner_for_eval(self, round_dir: Path) -> Path | None:
         """Copy learner's code from container to host for direct import.
@@ -956,58 +1353,110 @@ class InverseStrategyTournament(AbstractTournament):
 
         Returns True if successful, False otherwise.
         """
-        from revenge_bench.traces.offline_eval import (
-            load_move_function,
-            resolve_submission_path,
-        )
+        import importlib.util
+        import sys
 
         # Use game's submission path (e.g. "main.py", "client/player.py")
         submission = self.game.submission
 
-        submission_py, code_dir = resolve_submission_path(
-            learner_code_dir, submission
-        )
+        # copy_from_container copies /workspace as a subdirectory
+        workspace_dir = learner_code_dir / "workspace"
+        if workspace_dir.exists():
+            submission_py = workspace_dir / submission
+            code_dir = submission_py.parent
+        else:
+            # Fallback to direct path
+            submission_py = learner_code_dir / submission
+            code_dir = submission_py.parent
+
+        # For directory-based submissions (e.g. RoboCode's "robots/custom/"),
+        # fall back to main.py in the workspace root for offline evaluation.
+        if submission_py.is_dir() or not submission_py.exists():
+            fallback = (
+                workspace_dir if workspace_dir.exists() else learner_code_dir
+            ) / "main.py"
+            if fallback.exists():
+                submission_py = fallback
+                code_dir = fallback.parent
 
         if not submission_py.exists():
             self.logger.warning(f"Learner {submission} not found at {submission_py}")
             return False
 
-        module, move_func, kind = load_move_function(submission_py, code_dir)
+        try:
+            # Add learner's code directory to path for any relative imports
+            if str(code_dir) not in sys.path:
+                sys.path.insert(0, str(code_dir))
 
-        if module is None:
-            self.logger.warning("Failed to load learner module")
+            # Load the module
+            spec = importlib.util.spec_from_file_location("learner_main", submission_py)
+            if spec is None or spec.loader is None:
+                self.logger.warning("Failed to create module spec")
+                return False
+
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # Verify it has a move function (accept move(), choose_move(), or robot())
+            if hasattr(module, "move"):
+                self._learner_move_func = module.move
+            elif hasattr(module, "choose_move"):
+                self._learner_move_func = module.choose_move
+                self.logger.info("Using choose_move() instead of move()")
+            elif hasattr(module, "robot"):
+                self._learner_move_func = module.robot
+                self.logger.info("Using robot() (RobotRumble API)")
+            else:
+                self.logger.warning(
+                    f"Learner {submission} has no move(), choose_move(), or robot() function"
+                )
+                return False
+
+            self._learner_module = module
+            self.logger.info(f"Loaded learner module from {submission_py}")
+            return True
+
+        except Exception as e:
+            self.logger.warning(f"Failed to load learner module: {e}")
+            import traceback
+
+            traceback.print_exc()
             return False
-
-        if move_func is None:
-            self.logger.warning(
-                f"Learner {submission} has no move(), choose_move(), or robot() function"
-            )
-            return False
-
-        if kind == "choose_move":
-            self.logger.info("Using choose_move() instead of move()")
-        elif kind == "robot":
-            self.logger.info("Using robot() (RobotRumble API)")
-
-        self._learner_move_func = move_func
-        self._learner_module = module
-        self.logger.info(f"Loaded learner module from {submission_py}")
-        return True
 
     def _process_huskybench_traces(
         self, round_dir: Path, round_num: int
     ) -> dict[str, Any] | None:
-        """Offline evaluation for HuskyBench (poker) via the shared scorer."""
-        from revenge_bench.traces.offline_eval import (
-            evaluate_huskybench_submission_with_action_provider,
-            find_huskybench_sim_files,
-            make_huskybench_bot_action_provider,
+        """Offline evaluation for HuskyBench (poker).
+
+        HuskyBench bots use a class-based API: they subclass Bot and implement
+        get_action(round_state: RoundStateClient, remaining_chips) -> (PokerAction, int).
+
+        This method:
+        1. Copies the learner's code from its container
+        2. Loads the Bot subclass and instantiates it
+        3. For each target action in the game logs, reconstructs the state,
+           converts it to RoundStateClient, queries the bot, and compares
+        """
+        import importlib.util
+        import inspect
+        import sys
+
+        from revenge_bench.traces.parsers.huskybench import (
+            actions_distance,
+            extract_state_action_pairs,
+            normalize_action,
         )
 
-        if not find_huskybench_sim_files(round_dir):
+        # --- Find simulation files ---
+        # In multi-opponent mode, game_log files live inside opp_*/ subdirs.
+        sim_files = sorted(round_dir.glob("game_log_*.json")) or sorted(
+            round_dir.glob("opp_*/game_log_*.json")
+        )
+        if not sim_files:
             self.logger.warning(f"No game_log files in {round_dir}")
             return None
 
+        # --- Load learner's Bot class ---
         learner_code_dir = self._setup_learner_for_eval(round_dir)
         if learner_code_dir is None:
             self.logger.warning("Failed to copy learner code for HuskyBench evaluation")
@@ -1027,24 +1476,200 @@ class InverseStrategyTournament(AbstractTournament):
             )
             return {"error": f"Submission file {self.game.submission} not found"}
 
-        provider, error = make_huskybench_bot_action_provider(submission_py, code_dir)
-        if error is not None or provider is None:
-            self.logger.warning(error)
-            return {"error": error}
+        if str(code_dir) not in sys.path:
+            sys.path.insert(0, str(code_dir))
 
-        summary = evaluate_huskybench_submission_with_action_provider(
-            round_dir=round_dir,
-            round_num=round_num,
-            target_name=self.target_agent.name,
-            learner_name=self.learner_agent.name,
-            action_provider=provider,
-            logger=self.logger,
-            evaluation_type="offline_bot_class",
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "learner_huskybench", submission_py
+            )
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        except Exception as e:
+            self.logger.warning(f"Failed to load learner module: {e}")
+            return {"error": f"Failed to load module: {e}"}
+
+        # Find the Bot subclass with get_action()
+        bot_class = None
+        for attr_name in dir(module):
+            attr = getattr(module, attr_name, None)
+            if (
+                inspect.isclass(attr)
+                and hasattr(attr, "get_action")
+                and attr_name != "Bot"
+            ):
+                bot_class = attr
+                break
+
+        if bot_class is None:
+            self.logger.warning(
+                "No Bot subclass with get_action() found in learner module"
+            )
+            return {"error": "No Bot subclass with get_action() found in submission"}
+
+        RoundStateClient = getattr(module, "RoundStateClient", None)
+        if RoundStateClient is None:
+            self.logger.warning("RoundStateClient not found in learner module")
+            return {"error": "RoundStateClient not importable from submission"}
+
+        try:
+            bot = bot_class()
+        except Exception as e:
+            self.logger.warning(f"Failed to instantiate {bot_class.__name__}: {e}")
+            return {"error": f"Failed to instantiate {bot_class.__name__}: {e}"}
+
+        self.logger.info(
+            f"Loaded HuskyBench bot {bot_class.__name__} from {submission_py}"
         )
-        traces_file = round_dir / "traces.json"
-        traces_file.write_text(json.dumps(summary, indent=2))
-        self.logger.info(f"Saved HuskyBench trace summary to {traces_file}")
-        return summary
+
+        # --- Helper: query bot with a reconstructed state dict ---
+        def query_bot(state: dict) -> str | None:
+            player_bets = {"0": 0, "1": 0}
+            player_actions = {}
+            for ah in state.get("action_history", []):
+                pid = "0" if ah["player"] == "you" else "1"
+                player_bets[pid] = player_bets.get(pid, 0) + ah.get("amount", 0)
+                player_actions[pid] = ah.get("action", "")
+
+            remaining_chips = state.get("my_stack", 10000)
+            blinds = state.get("blinds", {})
+
+            # Set hole cards via on_start (bots store them as self.my_hand)
+            try:
+                bot.on_start(
+                    remaining_chips,
+                    state.get("hole_cards", []),
+                    blinds.get("big", 10),
+                    1,
+                    0,
+                    [0, 1],
+                )
+            except Exception:
+                pass
+
+            try:
+                round_state = RoundStateClient(
+                    round_num=state.get("hand_number", 0),
+                    round=state.get("round", "preflop"),
+                    community_cards=state.get("community_cards", []),
+                    pot=state.get("pot", 0),
+                    current_player=[0],
+                    current_bet=state.get("current_bet", 0),
+                    min_raise=blinds.get("big", 10),
+                    max_raise=remaining_chips,
+                    player_bets=player_bets,
+                    player_actions=player_actions,
+                    player_money={
+                        "0": remaining_chips,
+                        "1": state["opponent_stacks"][0]
+                        if state.get("opponent_stacks")
+                        else 10000,
+                    },
+                    side_pots=[],
+                )
+            except Exception:
+                return None
+
+            try:
+                try:
+                    bot.on_round_start(round_state, remaining_chips)
+                except Exception:
+                    pass
+                result = bot.get_action(round_state, remaining_chips)
+                if isinstance(result, tuple) and len(result) == 2:
+                    poker_action, amount = result
+                    action_name = poker_action.name
+                    if action_name == "ALL_IN":
+                        return "RAISE:1.0000"
+                    elif action_name == "RAISE":
+                        return normalize_action(
+                            {"action": "RAISE", "amount": amount},
+                            player_stack=remaining_chips,
+                        )
+                    else:
+                        return action_name
+            except Exception:
+                pass
+            return None
+
+        # --- Evaluate across all simulation files ---
+        target_name = self.target_agent.name
+        # Game logs have playerNames rewritten to actual agent names by
+        # HuskyBenchArena.get_results(), so we can match by role name directly.
+        target_selector = target_name
+        total_actions = 0
+        total_distance = 0.0
+        per_simulation = []
+        all_nonzero = []
+
+        for sim_file in sim_files:
+            try:
+                sim_total = 0
+                sim_distance = 0.0
+                sim_nonzero = []
+
+                state_action_pairs = extract_state_action_pairs(
+                    sim_file, target_selector
+                )
+
+                for turn_idx, (target_state, target_action) in enumerate(
+                    state_action_pairs
+                ):
+                    learner_action = query_bot(target_state)
+                    if learner_action is None:
+                        continue
+
+                    sim_total += 1
+                    distance = actions_distance(
+                        learner_action,
+                        target_action,
+                        player_stack=target_state.get("my_stack"),
+                    )
+                    sim_distance += distance
+
+                    if distance > 0.0:
+                        entry = {
+                            "sim_file": str(sim_file.relative_to(round_dir)),
+                            "turn": target_state.get("turn", turn_idx),
+                            "learner_action": learner_action,
+                            "target_action": target_action,
+                            "distance": distance,
+                            "state": target_state,
+                        }
+                        sim_nonzero.append(entry)
+                        all_nonzero.append(entry)
+
+                total_actions += sim_total
+                total_distance += sim_distance
+                per_simulation.append(
+                    {
+                        "file": str(sim_file.relative_to(round_dir)),
+                        "total": sim_total,
+                        "distance_sum": sim_distance,
+                        "mean_distance": sim_distance / sim_total
+                        if sim_total > 0
+                        else 0.0,
+                        "num_nonzero": len(sim_nonzero),
+                    }
+                )
+            except Exception as e:
+                self.logger.warning(f"Error processing {sim_file}: {e}")
+                import traceback
+
+                traceback.print_exc()
+                continue
+
+        return self._build_trace_summary(
+            round_num,
+            "HuskyBench",
+            target_name,
+            "offline_bot_class",
+            total_actions,
+            total_distance,
+            per_simulation,
+            all_nonzero,
+            round_dir,
+        )
 
     def _setup_compiled_learner(self, round_dir: Path) -> str:
         """Compile the learner's bot for subprocess-based offline evaluation.
@@ -1127,10 +1752,20 @@ class InverseStrategyTournament(AbstractTournament):
         string for BattleSnake, list of dicts for RobotRumble/Halite, etc.)
         so it can be compared correctly.
         """
-        from revenge_bench.traces.offline_eval import query_move
+        if not hasattr(self, "_learner_move_func") or self._learner_move_func is None:
+            return None
 
-        move_func = getattr(self, "_learner_move_func", None)
-        return query_move(move_func, state, logger=self.logger)
+        try:
+            result = self._learner_move_func(state)
+            # Unwrap BattleSnake-style {"move": "up"} responses;
+            # other games (RoboCode, HuskyBench) return the action directly.
+            if isinstance(result, dict) and "move" in result:
+                return result["move"]
+            return result
+
+        except Exception as e:
+            self.logger.debug(f"Error querying learner: {e}")
+            return None
 
     def _query_learner_per_unit(self, state: dict) -> list[dict]:
         """Query learner's robot(state, unit) for each unit (RobotRumble).

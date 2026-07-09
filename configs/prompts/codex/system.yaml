@@ -20,66 +20,11 @@ instance_template: |
   - Goal: If you were in the target's exact position, would you make the same decision?
 
   The key files are in this codebase ({{working_dir}}):
-  {% if route == "harbor" and id == "halite" %} - `submission/`: Your recovered policy (must match target's behavior)
-   - `probe/`: Your probe instrument — run `sudo run_probe` to query the sealed target
-   - `rounds/0/traces.json`: Initial normal-path-style distance summary and target-action mismatches for the starter bot
-   - `rounds/0/opp_*/sim_*.hlt`: Visible prior target-vs-opponent Halite replays
-   - `probe_trace_*.json`: Saved probe results (your only window into the target){% elif route == "harbor" and id == "robocode" %} - `main.py`: Your Python policy to edit (must match target's behavior)
-   - `probe/`: Your Java probe bot — run `sudo run_probe` to query the sealed target
-   - `rounds/0/traces.json`: Initial normal-path-style distance summary and target-action mismatches for the starter bot
-   - `rounds/0/opp_*/record_*.xml`: Visible prior target-vs-opponent RoboCode XML recordings
-   - `probe_trace_*.json`: Saved probe results (your only window into the target){% elif route == "harbor" and id == "huskybench" %} - `client/player.py`: Your recovered poker bot policy (must match target's behavior)
-   - `probe/client/player.py`: Your probe poker bot — run `sudo run_probe` to query the sealed target
-   - `rounds/0/traces.json`: Initial normal-path-style distance summary and target-action mismatches for the starter bot
-   - `rounds/0/opp_*/game_log_*.json`: Visible prior target-vs-opponent HuskyBench poker hand logs
-   - `probe_trace_*.json`: Saved probe results (your only window into the target){% elif route == "harbor" and id == "robotrumble" %} - `robot.js`: Your recovered policy (must match target's behavior)
-   - `probe.js`: Your probe robot — run `sudo run_probe` to query the sealed target
-   - `rounds/0/traces.json`: Initial normal-path-style distance summary and target-action mismatches for the starter bot
-   - `rounds/0/opp_*/sim_*.json`: Visible prior target-vs-opponent RobotRumble simulations
-   - `probe_trace_*.json`: Saved probe results (your only window into the target){% else %} - `main.py`: Your code to edit (must match target's behavior)
+   - `main.py`: Your code to edit (must match target's behavior)
    - `docs/`: Game documentation
-   {% if route == "harbor" %}- `probe.py`: Your probe instrument — run `sudo run_probe` to query the sealed target
-   - `probe_trace_*.json`: Saved probe results (your only window into the target){% else %}- `/logs/rounds/`: Traces from previous rounds{% endif %}{% endif %}
+   - `/logs/rounds/`: Traces from previous rounds
 
-  {% if route == "harbor" %}## Visible Evidence + Probe Results
-
-  You work in a single container session — there is NO per-round scoring. You do
-  start with the same kind of round-0 feedback used by the normal benchmark:
-  `{{working_dir}}/rounds/0/traces.json` summarizes your starter {% if id == "halite" %}`submission/`{% elif id == "huskybench" %}`client/player.py`{% elif id == "robotrumble" %}`robot.js`{% else %}`main.py`{% endif %}
-  against visible target-vs-opponent traces, and
-  `{{working_dir}}/rounds/0/opp_*/{% if id == "halite" %}sim_*.hlt{% elif id == "robocode" %}record_*.xml{% elif id == "huskybench" %}game_log_*.json{% elif id == "robotrumble" %}sim_*.json{% else %}sim_*.jsonl{% endif %}` contains the raw traces. These are
-  evidence, not final evaluation labels. Each `sudo run_probe` writes
-  `{{working_dir}}/probe_trace_{N}.json` with additional (state, action) pairs the
-  target produced against your probe.
-
-  ### traces.json Format
-  ```json
-  {
-    "mean_distance": 0.75,         // Mean action distance (goal: 0.0 = perfect match)
-    "total_actions": 100,           // Total states evaluated
-    "total_distance": 75.0,         // Sum of action distances
-    "nonzero_distances": [          // Actions with distance > 0 (with full state)
-      {
-        "turn": 5,
-        "learner_action": {% if id == "halite" %}[[2, 3, 0], [4, 5, 1]]{% elif id == "robocode" %}{"velocity": 8, "turn_body": 5, "turn_gun": -3, "turn_radar": 10, "fire_power": 2}{% elif id == "huskybench" %}"CALL"{% else %}"up"{% endif %},
-        "target_action": {% if id == "halite" %}[[2, 3, 1], [4, 5, 1]]{% elif id == "robocode" %}{"velocity": 6, "turn_body": -2, "turn_gun": 8, "turn_radar": -15, "fire_power": 1}{% elif id == "huskybench" %}"RAISE:0.2500"{% else %}"down"{% endif %},
-        "distance": 1.0,
-        "state": {...}              // The exact game state - use this to debug!
-      },
-      ...
-    ]
-  }
-  ```
-
-  ## Workflow
-
-  1. **Explore `{{working_dir}}`** - read {% if id == "halite" %}`submission/`, `probe/`{% elif id == "huskybench" %}`client/player.py`, `probe/client/player.py`, and the game code{% elif id == "robotrumble" %}`robot.js`, `probe.js`, and the game code{% else %}`main.py`, `docs/`, and the game code{% endif %}
-  2. **Read `rounds/0/traces.json` first** - check starter distance and target-action mismatches
-  3. **Read visible raw traces** - inspect `rounds/0/opp_*/{% if id == "halite" %}sim_*.hlt{% elif id == "robocode" %}record_*.xml{% elif id == "huskybench" %}game_log_*.json{% elif id == "robotrumble" %}sim_*.json{% else %}sim_*.jsonl{% endif %}` for target behavior across opponents
-  4. **Probe early** - edit {% if id == "halite" or id == "robocode" %}`probe/`{% elif id == "huskybench" %}`probe/client/player.py`{% elif id == "robotrumble" %}`probe.js`{% else %}`probe.py`{% endif %}, run `sudo run_probe`, then read the resulting `probe_trace_{N}.json`
-  5. **Look for patterns** - what rule is the target following across traces and probes?
-  6. **Update {% if id == "halite" %}`submission/`{% elif id == "huskybench" %}`client/player.py`{% elif id == "robotrumble" %}`robot.js`{% else %}`main.py`{% endif %}** - implement the pattern you discovered
-  7. **Repeat while you have probe budget** - then leave {% if id == "halite" %}`submission/`{% elif id == "huskybench" %}`client/player.py`{% elif id == "robotrumble" %}`robot.js`{% else %}`main.py`{% endif %} as your final policy; it is graded once, offline, after your session ends{% else %}## Trace Files (IMPORTANT)
+  ## Trace Files (IMPORTANT)
 
   After each round, traces are saved to `/logs/rounds/{round_num}/`:
    - `traces.json`: **START HERE** - Summary with mean action distance and actions with nonzero distance
@@ -111,14 +56,9 @@ instance_template: |
   2. **Analyze nonzero_distances** - Each has the full state, your action, and target's action
   3. **Look for patterns** - What rule is the target following that you're missing?
   4. **Update main.py** - Implement the pattern you discovered
-  5. **Submit** - Your code is evaluated after each round{% endif %}
+  5. **Submit** - Your code is evaluated after each round
 
-  {% if route == "harbor" %}This is a single continuous session (no rounds). Your conversation history —
-  earlier turns, tool outputs, and your own reasoning — stays visible throughout
-  (older outputs may be compacted to summaries to save context). There is no
-  repeated distance score during the session: the initial `traces.json`, visible
-  raw traces, and probes are your feedback, and {% if id == "halite" %}`submission/`{% elif id == "huskybench" %}`client/player.py`{% elif id == "robotrumble" %}`robot.js`{% else %}`main.py`{% endif %} is graded once after
-  you finish against fresh hidden target traces.{% elif context_mode == "reset" %}This is round {{round}} of {{rounds}}.
+  {% if context_mode == "reset" %}This is round {{round}} of {{rounds}}.
 
   ## Your Distance Progress (lower is better, 0.0 = perfect match)
   {{distance_progress}}
@@ -140,18 +80,10 @@ instance_template: |
 
   ## Tips
 
-  {% if route == "harbor" %}1. Re-read prior turns: your earlier analysis is still in this conversation.
-  2. Start by reading `rounds/0/traces.json` to see your starter distance and nonzero mismatches.
-  3. Use `rounds/0/opp_*/{% if id == "halite" %}sim_*.hlt{% elif id == "robocode" %}record_*.xml{% elif id == "huskybench" %}game_log_*.json{% elif id == "robotrumble" %}sim_*.json{% else %}sim_*.jsonl{% endif %}` as prior evidence, not as final labels.
-  4. Probe before editing {% if id == "halite" %}`submission/`{% elif id == "huskybench" %}`client/player.py`{% elif id == "robotrumble" %}`robot.js`{% else %}`main.py`{% endif %} — probes are your controlled experiments against the sealed target.
-  5. Each `probe_trace_{N}.json` shows, per turn, what your probe did and what the target did in the same state — focus on the turns where they differ.
-  6. {% if id == "huskybench" %}The target likely follows poker rules based on hole cards, board texture, betting round, current bet, pot odds, stack, and action history.{% else %}The target likely follows simple rules (chase food, avoid walls, prefer certain directions).{% endif %}
-  7. Test a hypothesis by making {% if id == "halite" or id == "robocode" %}`probe/`{% elif id == "huskybench" %}`probe/client/player.py`{% elif id == "robotrumble" %}`probe.js`{% else %}`probe.py`{% endif %} force the situation, then re-probe.
-  8. You can write analysis scripts to process both `rounds/0` and `probe_trace_*.json`.
-  9. Keep everything inside `{{working_dir}}`.{% else %}{% if context_mode == "reset" %}1. Check README_agent.md for notes from previous rounds.{% else %}1. Re-read prior turns: your earlier analysis is still in this conversation.{% endif %}
+  {% if context_mode == "reset" %}1. Check README_agent.md for notes from previous rounds.{% else %}1. Re-read prior turns: your earlier analysis is still in this conversation.{% endif %}
   2. Start by reading `/logs/rounds/{previous_round}/traces.json` to see your mean action distance.
   3. Focus on the `nonzero_distances` array - each entry shows where your action differed from target's.
   4. The target likely follows simple rules (chase food, avoid walls, prefer certain directions).
   5. Test your hypothesis by checking if it explains ALL the nonzero distance entries.
   6. You can write analysis scripts to process the nonzero distances programmatically.
-  7. Remember `/logs/` is outside your working directory when writing analyses.{% endif %}
+  7. Remember `/logs/` is outside your working directory when writing analyses.

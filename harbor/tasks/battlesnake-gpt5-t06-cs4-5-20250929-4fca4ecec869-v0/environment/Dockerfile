@@ -87,7 +87,7 @@ RUN su - agent -c 'set -euo pipefail; \
  && ln -sf /home/agent/.nvm/versions/node/$(ls /home/agent/.nvm/versions/node | sort -V | tail -1)/bin/codex /usr/local/bin/codex
 
 # The scorer imports the REAL BattleSnake trace parser + the shared offline
-# scorer (revenge_bench.traces.offline_eval) that the native tournament also
+# Harbor scorer (revenge_bench.harbor.traces.offline_eval) that
 # uses. revenge_bench is NOT published to PyPI, so we install THIS working
 # tree's build, staged as a wheel into the build context by build_context.sh
 # (run it before `harbor run` / `docker build`). --no-deps keeps the image lean:
@@ -96,7 +96,7 @@ COPY wheels/ /tmp/wheels/
 RUN python3 -m pip install --no-deps /tmp/wheels/revenge_bench-*.whl \
  && python3 -m pip install zstandard \
  && rm -rf /tmp/wheels \
- && python3 -I -c "from revenge_bench.traces import offline_eval; from revenge_bench.traces.parsers import battlesnake; print('revenge_bench import OK')"
+ && python3 -I -c "from revenge_bench.harbor.traces import offline_eval; from revenge_bench.traces.parsers import battlesnake; print('revenge_bench import OK')"
 
 # --- Bake the sealed-target + probe oracle helpers ----------------------------
 RUN mkdir -p /opt/battlesnake /opt/revengebench /target /logs/verifier /run \

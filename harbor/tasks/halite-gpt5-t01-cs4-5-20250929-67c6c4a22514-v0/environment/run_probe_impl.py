@@ -16,7 +16,7 @@ from halite_common import (
     prepare_submission,
     run_halite,
 )
-from revenge_bench.traces.parsers.halite import (
+from revenge_bench.harbor.traces.parsers.halite import (
     build_probe_trace_payload,
     load_hlt_file,
 )

@@ -16,7 +16,7 @@ hidden from the agent during its work session) and:
 Single source of truth
 -----------------------
 Scoring is delegated to the shared BattleSnake trace scorer in
-``revenge_bench.traces.offline_eval``. Harbor supplies an artifact-backed move
+``revenge_bench.harbor.traces.offline_eval``. Harbor supplies an artifact-backed move
 provider so learner-authored code never executes in the root process that can
 read hidden verifier traces; stdout/stderr are logs only.
 
@@ -45,7 +45,7 @@ from typing import Any
 def _load_deps():
     """Import the shared scorer, failing loudly."""
     try:
-        from revenge_bench.traces.offline_eval import (
+        from revenge_bench.harbor.traces.offline_eval import (
             evaluate_battlesnake_submission_with_move_provider,
             find_battlesnake_sim_files,
         )

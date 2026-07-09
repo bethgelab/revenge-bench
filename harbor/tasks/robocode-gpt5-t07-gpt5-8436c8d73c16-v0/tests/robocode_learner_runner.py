@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-from revenge_bench.traces.offline_eval import load_move_function, query_move
+from revenge_bench.harbor.traces.offline_eval import load_move_function, query_move
 
 
 def main() -> int:

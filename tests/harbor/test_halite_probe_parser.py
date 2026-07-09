@@ -36,7 +36,7 @@ def test_halite_probe_payload_matches_normal_path_parser_byte_identically():
     from revenge_bench.tournaments.inverse_strategy_interventionist import (
         InverseStrategyInterventionistTournament,
     )
-    from revenge_bench.traces.parsers.halite import build_probe_trace_payload
+    from revenge_bench.harbor.traces.parsers.halite import build_probe_trace_payload
 
     probe_id = 7
     replay_name = "probe_7_sim_0.hlt"
@@ -69,7 +69,7 @@ def test_halite_probe_payload_matches_normal_path_parser_byte_identically():
 
 
 def test_halite_probe_payload_written_by_harbor_adds_only_remaining(tmp_path: Path):
-    from revenge_bench.traces.parsers.halite import build_probe_trace_payload
+    from revenge_bench.harbor.traces.parsers.halite import build_probe_trace_payload
 
     probe_id = 3
     replay_name = "probe_3_sim_0.hlt"

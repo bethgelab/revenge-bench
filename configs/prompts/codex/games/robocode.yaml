@@ -131,10 +131,10 @@ game_description: |
   run controlled experiments.
 
   **Recommended workflow each round:**
-  1. Read {% if route == "harbor" %}`rounds/0/traces.json`{% else %}traces.json{% endif %} — identify mismatches (check `component_errors` for worst components)
+  1. Read traces.json — identify mismatches (check `component_errors` for worst components)
   2. Form a hypothesis (e.g., "target aims gun at enemy" or "target fires only when close")
   3. Design a probe to elicit specific behavior from the target (edit Java files in `probe/` to create that scenario)
-  4. {% if route == "harbor" %}Run `sudo run_probe` and analyze `probe_trace_{N}.json`{% else %}Call the `run_probe` MCP tool and analyze results{% endif %}
+  4. Call the `run_probe` MCP tool and analyze results
   5. Run 1-2 more probes to refine understanding
   6. THEN edit `main.py` based on confirmed hypotheses
 
@@ -145,16 +145,15 @@ game_description: |
 
   You can run probe simulations AT ANY TIME during editing!
 
-  {% if route == "harbor" %}`probe/` starts as a copy of `robots/custom/`.
-  You modify the Java bot in `probe/` to create specific game situations, then run `sudo run_probe`.{% else %}`probe/` is automatically seeded from `robots/custom/` at the start of each round.
-  You modify the Java bot in `probe/` to create specific game situations, then call the `run_probe` MCP tool.{% endif %}
+  `probe/` is automatically seeded from `robots/custom/` at the start of each round.
+  You modify the Java bot in `probe/` to create specific game situations, then call the `run_probe` MCP tool.
 
   ### How to Probe
   1. Edit Java files in `probe/` implementing a bot that will elicit the behavior you want to test
-  2. {% if route == "harbor" %}Run `sudo run_probe`{% else %}Call the `run_probe` MCP tool{% endif %} — the system will play your probe bot against the target
+  2. Call the `run_probe` MCP tool — the system will play your probe bot against the target
   3. Read the results to see how the target responded in the situations your probe created
 
-  {% if route == "harbor" %}You have a bounded total probe budget for this single session. The remaining budget is tracked in `/workspace/.probe_budget`, and each successful `sudo run_probe` decrements it. **Spend it deliberately — aim to use several probes before finalizing main.py.**{% else %}You get up to 5 probes per round. **Aim to use at least 2 per round.**{% endif %}
+  You get up to 5 probes per round. **Aim to use at least 2 per round.**
 
   ### CRITICAL: Separate Exploration from Exploitation
 
@@ -175,7 +174,7 @@ game_description: |
 
   ### Probe Output Format
   After each probe, results are written to a JSON file in your workspace:
-  {% if route == "harbor" %}`probe_trace_{probe_num}.json`{% else %}`probe_trace_r{round}_p{probe_num}.json`{% endif %}
+  `probe_trace_r{round}_p{probe_num}.json`
 
   ```json
   {
@@ -208,10 +207,8 @@ game_description: |
   - `main.py` - **YOUR SUBMISSION** — Python file with `move(state)` function. **Only edit after probing.**
   - `probe/` - Your experiment instrument (Java bot). **Must create different scenarios.** Auto-seeded each round.
   - `docs/` - Game documentation and API reference
-  {% if route == "harbor" %}- `rounds/0/traces.json` - Initial normal-path-style distance summary and per-component error breakdowns for the starter bot
-  - `rounds/0/opp_*/record_*.xml` - Visible prior target-vs-opponent XML traces
-  - `probe_trace_{N}.json` - Results from `sudo run_probe` calls{% else %}- `/logs/rounds/{N}/traces.json` - Accuracy results and per-component error breakdowns
-  - `/logs/rounds/{N}/opp_*/record_*.xml` - Raw game traces (XML, target vs opponents){% endif %}
+  - `/logs/rounds/{N}/traces.json` - Accuracy results and per-component error breakdowns
+  - `/logs/rounds/{N}/opp_*/record_*.xml` - Raw game traces (XML, target vs opponents)
 
   ## Tips for Strategy Recovery
   1. **PROBE FIRST** — don't jump straight to editing your submission

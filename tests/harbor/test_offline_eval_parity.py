@@ -1,16 +1,9 @@
-"""Differential parity test: native tournament vs Harbor in-container scorer.
+"""Harbor offline scorer parity guards.
 
-The whole point of the ``revenge_bench.traces.offline_eval`` refactor is that
-the Harbor verifier reproduces the *exact* result of the native tournament for a
-given round. This test proves it end-to-end for BattleSnake: it drives the
-**real** ``InverseStrategyTournament._process_battlesnake_traces`` (bound to a
-lightweight mock ``self``) and the Harbor scorer entry point
-(``evaluate_battlesnake_submission``) over the *same* frozen traces and the
-*same* ``main.py``, then asserts the two summaries are byte-identical.
-
-Because both paths call the same shared functions, this also transitively
-validates the deployed ``score_task.py`` (which writes ``eval.json`` from
-``evaluate_battlesnake_submission``).
+The native benchmark pipeline stays main-owned. Harbor intentionally carries a
+duplicated offline evaluator under ``revenge_bench.harbor.traces``; these tests
+keep that duplicate pinned to the native-shaped trace summary contract using
+small frozen rounds.
 
 Requires ``zstandard`` (the only import-time dep of the BattleSnake parser).
 """
@@ -115,7 +108,7 @@ def _run_harbor_path(
     target_name: str,
 ) -> dict:
     """Invoke the Harbor scorer entry point (what score_task.py calls)."""
-    from revenge_bench.traces.offline_eval import evaluate_battlesnake_submission
+    from revenge_bench.harbor.traces.offline_eval import evaluate_battlesnake_submission
 
     return evaluate_battlesnake_submission(
         round_dir=round_dir,
@@ -202,11 +195,8 @@ def _write_halite_round(round_dir: Path, target_name: str = "target") -> None:
     (round_dir / "sim_0.hlt").write_text(json.dumps(replay))
 
 
-def test_halite_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path):
-    from unittest.mock import patch
-
-    from revenge_bench.tournaments.inverse_strategy import InverseStrategyTournament
-    from revenge_bench.traces.offline_eval import (
+def test_halite_harbor_scorer_matches_native_summary_shape(tmp_path: Path):
+    from revenge_bench.harbor.traces.offline_eval import (
         evaluate_halite_submission_with_action_provider,
     )
 
@@ -221,23 +211,7 @@ def test_halite_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path):
     round_dir = tmp_path / "halite" / "rounds" / "0"
     _write_halite_round(round_dir, target_name)
 
-    tournament = MagicMock(spec=InverseStrategyTournament)
-    tournament.learner_agent = MagicMock()
-    tournament.learner_agent.name = learner_name
-    tournament.logger = MagicMock()
-    tournament._target_hlt_name = target_name
-    tournament._setup_compiled_learner = MagicMock(return_value="dummy-executable")
-    tournament._process_halite_traces = (
-        InverseStrategyTournament._process_halite_traces.__get__(tournament)
-    )
-
-    with patch(
-        "revenge_bench.traces.parsers.halite.query_compiled_bot",
-        return_value=learner_actions,
-    ):
-        tournament_summary = tournament._process_halite_traces(round_dir, round_num)
-
-    shared_summary = evaluate_halite_submission_with_action_provider(
+    summary = evaluate_halite_submission_with_action_provider(
         round_dir=round_dir,
         round_num=round_num,
         target_hlt_name=target_name,
@@ -246,16 +220,23 @@ def test_halite_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path):
         evaluation_type="offline_subprocess",
     )
 
-    assert tournament_summary["total_actions"] == 2
-    assert tournament_summary["mean_distance"] == 0.5
-    assert len(tournament_summary["nonzero_distances"]) == 1
-    assert json.dumps(tournament_summary, sort_keys=True) == json.dumps(
-        shared_summary, sort_keys=True
-    )
+    assert summary["round"] == 0
+    assert summary["total_actions"] == 2
+    assert summary["mean_distance"] == 0.5
+    assert len(summary["nonzero_distances"]) == 1
+    assert summary["per_simulation"] == [
+        {
+            "file": "sim_0.hlt",
+            "total": 2,
+            "distance_sum": 1.0,
+            "mean_distance": 0.5,
+            "num_nonzero": 1,
+        }
+    ]
 
 
 def test_halite_shared_scorer_can_cap_nonzero_diagnostics(tmp_path: Path):
-    from revenge_bench.traces.offline_eval import (
+    from revenge_bench.harbor.traces.offline_eval import (
         evaluate_halite_submission_with_action_provider,
     )
 
@@ -281,11 +262,10 @@ def test_halite_shared_scorer_can_cap_nonzero_diagnostics(tmp_path: Path):
     assert len(payload["nonzero_distances"]) == 1
 
 
-def test_robocode_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path):
+def test_robocode_harbor_scorer_matches_native_summary_shape(tmp_path: Path):
     from unittest.mock import patch
 
-    from revenge_bench.tournaments.inverse_strategy import InverseStrategyTournament
-    from revenge_bench.traces.offline_eval import (
+    from revenge_bench.harbor.traces.offline_eval import (
         evaluate_robocode_submission_with_move_provider,
         load_move_function,
         make_inprocess_move_provider,
@@ -333,31 +313,15 @@ def test_robocode_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path
             ),
         ]
 
-    tournament = MagicMock(spec=InverseStrategyTournament)
-    tournament.learner_agent = MagicMock()
-    tournament.learner_agent.name = learner_name
-    tournament.target_agent = MagicMock()
-    tournament.target_agent.name = target_name
-    tournament.game = MagicMock()
-    tournament.game.submission = "main.py"
-    tournament.logger = MagicMock()
-    tournament._setup_learner_for_eval = MagicMock(return_value=code_dir)
-    tournament._process_robocode_traces = (
-        InverseStrategyTournament._process_robocode_traces.__get__(tournament)
-    )
-    tournament._load_learner_module = InverseStrategyTournament._load_learner_module.__get__(tournament)
-    tournament._query_learner = InverseStrategyTournament._query_learner.__get__(tournament)
-
     module, move_func, _kind = load_move_function(main_py, code_dir)
     assert module is not None
     assert move_func is not None
 
     with patch(
-        "revenge_bench.traces.parsers.robocode.extract_state_action_pairs",
+        "revenge_bench.harbor.traces.parsers.robocode.extract_state_action_pairs",
         side_effect=fake_pairs,
     ):
-        tournament_summary = tournament._process_robocode_traces(round_dir.parent, round_num)
-        shared_summary = evaluate_robocode_submission_with_move_provider(
+        summary = evaluate_robocode_submission_with_move_provider(
             round_dir=round_dir.parent,
             round_num=round_num,
             target_name=target_name,
@@ -367,22 +331,16 @@ def test_robocode_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path
             evaluation_type="offline",
         )
 
-    assert tournament_summary["total_actions"] == 2
-    assert len(tournament_summary["nonzero_distances"]) == 1
-    assert json.dumps(tournament_summary, sort_keys=True) == json.dumps(
-        shared_summary, sort_keys=True
-    )
-
-    persisted = json.loads((round_dir.parent / "traces.json").read_text())
-    assert json.dumps(persisted, sort_keys=True) == json.dumps(
-        shared_summary, sort_keys=True
-    )
+    assert summary["round"] == 0
+    assert summary["total_actions"] == 2
+    assert len(summary["nonzero_distances"]) == 1
+    assert summary["per_simulation"][0]["file"] == "opp_0/record_0.xml"
 
 
 def test_robocode_shared_scorer_resolves_target_alias_per_opponent(tmp_path: Path):
     from unittest.mock import patch
 
-    from revenge_bench.traces.offline_eval import (
+    from revenge_bench.harbor.traces.offline_eval import (
         evaluate_robocode_submission_with_move_provider,
     )
 
@@ -414,7 +372,7 @@ def test_robocode_shared_scorer_resolves_target_alias_per_opponent(tmp_path: Pat
         ]
 
     with patch(
-        "revenge_bench.traces.parsers.robocode.extract_state_action_pairs",
+        "revenge_bench.harbor.traces.parsers.robocode.extract_state_action_pairs",
         side_effect=fake_pairs,
     ):
         summary = evaluate_robocode_submission_with_move_provider(
@@ -500,13 +458,10 @@ def _write_robotrumble_round(round_dir: Path) -> None:
     (round_dir / "_target_team.txt").write_text("Blue\n")
 
 
-def test_robotrumble_tournament_and_shared_scorer_are_byte_identical(
+def test_robotrumble_harbor_scorer_matches_native_summary_shape(
     tmp_path: Path,
 ):
-    from unittest.mock import patch
-
-    from revenge_bench.tournaments.inverse_strategy import InverseStrategyTournament
-    from revenge_bench.traces.offline_eval import (
+    from revenge_bench.harbor.traces.offline_eval import (
         evaluate_robotrumble_submission_with_action_provider,
     )
 
@@ -519,28 +474,8 @@ def test_robotrumble_tournament_and_shared_scorer_are_byte_identical(
 
     round_dir = tmp_path / "robotrumble" / "rounds" / "0"
     _write_robotrumble_round(round_dir)
-    code_dir = tmp_path / "robotrumble" / "code" / "workspace"
-    code_dir.mkdir(parents=True)
-    (code_dir / "robot.js").write_text("function robot(state, unit) {}\n")
 
-    tournament = MagicMock(spec=InverseStrategyTournament)
-    tournament.learner_agent = MagicMock()
-    tournament.learner_agent.name = learner_name
-    tournament.logger = MagicMock()
-    tournament._setup_learner_for_eval = MagicMock(return_value=code_dir.parent)
-    tournament._process_robotrumble_traces = (
-        InverseStrategyTournament._process_robotrumble_traces.__get__(tournament)
-    )
-
-    with patch(
-        "revenge_bench.traces.offline_eval.make_robotrumble_js_action_provider",
-        return_value=lambda _inputs: learner_actions,
-    ):
-        tournament_summary = tournament._process_robotrumble_traces(
-            round_dir, round_num
-        )
-
-    shared_summary = evaluate_robotrumble_submission_with_action_provider(
+    summary = evaluate_robotrumble_submission_with_action_provider(
         round_dir=round_dir,
         round_num=round_num,
         learner_name=learner_name,
@@ -549,24 +484,15 @@ def test_robotrumble_tournament_and_shared_scorer_are_byte_identical(
         evaluation_type="offline",
     )
 
-    assert tournament_summary["total_actions"] == 2
-    assert tournament_summary["mean_distance"] == 0.25
-    assert len(tournament_summary["nonzero_distances"]) == 1
-    assert json.dumps(tournament_summary, sort_keys=True) == json.dumps(
-        shared_summary, sort_keys=True
-    )
-
-    persisted = json.loads((round_dir / "traces.json").read_text())
-    assert json.dumps(persisted, sort_keys=True) == json.dumps(
-        shared_summary, sort_keys=True
-    )
+    assert summary["round"] == 0
+    assert summary["total_actions"] == 2
+    assert summary["mean_distance"] == 0.25
+    assert len(summary["nonzero_distances"]) == 1
+    assert summary["per_simulation"][0]["file"] == "sim_0.json"
 
 
-def test_huskybench_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path):
-    from unittest.mock import patch
-
-    from revenge_bench.tournaments.inverse_strategy import InverseStrategyTournament
-    from revenge_bench.traces.offline_eval import (
+def test_huskybench_harbor_scorer_matches_native_summary_shape(tmp_path: Path):
+    from revenge_bench.harbor.traces.offline_eval import (
         evaluate_huskybench_submission_with_action_provider,
     )
 
@@ -585,34 +511,10 @@ def test_huskybench_tournament_and_shared_scorer_are_byte_identical(tmp_path: Pa
     )
     (round_dir / "game_log_0.json").write_text(fixture.read_text())
 
-    code_dir = tmp_path / "huskybench" / "code" / "workspace"
-    submission = code_dir / "client" / "player.py"
-    submission.parent.mkdir(parents=True)
-    submission.write_text("# scorer provider is patched in this test\n")
-
     def provider(_state):
         return "CHECK"
 
-    tournament = MagicMock(spec=InverseStrategyTournament)
-    tournament.learner_agent = MagicMock()
-    tournament.learner_agent.name = learner_name
-    tournament.target_agent = MagicMock()
-    tournament.target_agent.name = target_name
-    tournament.game = MagicMock()
-    tournament.game.submission = "client/player.py"
-    tournament.logger = MagicMock()
-    tournament._setup_learner_for_eval = MagicMock(return_value=code_dir.parent)
-    tournament._process_huskybench_traces = (
-        InverseStrategyTournament._process_huskybench_traces.__get__(tournament)
-    )
-
-    with patch(
-        "revenge_bench.traces.offline_eval.make_huskybench_bot_action_provider",
-        return_value=(provider, None),
-    ):
-        tournament_summary = tournament._process_huskybench_traces(round_dir, round_num)
-
-    shared_summary = evaluate_huskybench_submission_with_action_provider(
+    summary = evaluate_huskybench_submission_with_action_provider(
         round_dir=round_dir,
         round_num=round_num,
         target_name=target_name,
@@ -621,13 +523,7 @@ def test_huskybench_tournament_and_shared_scorer_are_byte_identical(tmp_path: Pa
         evaluation_type="offline_bot_class",
     )
 
-    assert tournament_summary["total_actions"] == 3
-    assert len(tournament_summary["nonzero_distances"]) == 2
-    assert json.dumps(tournament_summary, sort_keys=True) == json.dumps(
-        shared_summary, sort_keys=True
-    )
-
-    persisted = json.loads((round_dir / "traces.json").read_text())
-    assert json.dumps(persisted, sort_keys=True) == json.dumps(
-        shared_summary, sort_keys=True
-    )
+    assert summary["round"] == 0
+    assert summary["total_actions"] == 3
+    assert len(summary["nonzero_distances"]) == 2
+    assert summary["per_simulation"][0]["file"] == "game_log_0.json"

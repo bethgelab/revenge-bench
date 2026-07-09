@@ -12,11 +12,11 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from revenge_bench.traces.offline_eval import (
+from revenge_bench.harbor.traces.offline_eval import (
     evaluate_huskybench_submission_with_action_provider,
     find_huskybench_sim_files,
 )
-from revenge_bench.traces.parsers.huskybench import extract_state_action_pairs
+from revenge_bench.harbor.traces.parsers.huskybench import extract_state_action_pairs
 
 
 class HuskyBenchArtifactActionProvider:

@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-from revenge_bench.traces.offline_eval import load_huskybench_bot, query_huskybench_bot
+from revenge_bench.harbor.traces.offline_eval import load_huskybench_bot, query_huskybench_bot
 
 
 def main() -> int:

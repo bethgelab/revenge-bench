@@ -14,11 +14,11 @@ from pathlib import Path
 
 sys.path.insert(0, "/opt/halite")
 
-from revenge_bench.traces.offline_eval import (
+from revenge_bench.harbor.traces.offline_eval import (
     evaluate_halite_submission_with_action_provider,
     find_halite_sim_files,
 )
-from revenge_bench.traces.parsers.halite import load_hlt_file
+from revenge_bench.harbor.traces.parsers.halite import load_hlt_file
 
 MAX_NONZERO_DISTANCES = 200
 

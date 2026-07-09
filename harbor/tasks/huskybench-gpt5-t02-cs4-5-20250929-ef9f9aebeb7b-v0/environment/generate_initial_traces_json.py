@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from revenge_bench.traces.offline_eval import (
+from revenge_bench.harbor.traces.offline_eval import (
     evaluate_huskybench_submission_with_action_provider,
     make_huskybench_bot_action_provider,
 )

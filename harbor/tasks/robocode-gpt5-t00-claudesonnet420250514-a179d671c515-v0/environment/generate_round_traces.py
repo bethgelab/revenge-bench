@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-from revenge_bench.traces.robocode_probe import (
+from revenge_bench.harbor.traces.robocode_probe import (
     RC_FILE,
     compile_robot_package,
     rewrite_robot_package,

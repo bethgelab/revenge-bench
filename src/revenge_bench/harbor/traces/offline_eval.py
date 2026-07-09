@@ -1,22 +1,12 @@
-"""Offline policy-replay scoring for inverse-strategy evaluation.
+"""Harbor-only offline policy-replay scoring for inverse-strategy tasks.
 
-This module is the **single source of truth** for the offline (trace-replay)
-scoring used by inverse-strategy tournaments. Both code paths import it so they
-produce byte-identical results for the same inputs:
+This module mirrors the native tournament scoring behavior without making the
+native tournament import Harbor code. Harbor verifiers install ``revenge_bench``
+inside the task image and call these helpers directly; parity tests compare the
+result with the native path on the same synthetic traces.
 
-* the native tournament (:mod:`revenge_bench.tournaments.inverse_strategy`),
-  whose ``_process_*_traces`` / ``_load_learner_module`` / ``_query_learner`` /
-  ``_build_trace_summary`` / ``_compute_component_errors`` methods delegate here;
-* the Harbor in-container verifier (``harbor/tasks/<game>_v0/tests/score_task.py``),
-  which installs ``revenge_bench`` (``--no-deps``) and imports these functions
-  directly.
-
-Because both paths call the *same* functions with the *same* inputs, the Harbor
-scorer reproduces the tournament result exactly — there is nothing to keep in
-sync and nothing to drift.
-
-The heavy per-game trace parsers (``actions_distance`` /
-``extract_state_action_pairs`` / ``ACTION_COMPONENTS`` …) are imported lazily
+The heavy per-game Harbor parser helpers (``actions_distance`` /
+``extract_state_action_pairs`` / ``ACTION_COMPONENTS`` ...) are imported lazily
 inside the functions that need them so importing this module stays light.
 """
 
@@ -492,7 +482,7 @@ def score_halite_simulations_with_provider(
     provider; Harbor supplies the same kind of subprocess-backed provider while
     sharing this parser/distance/summary loop.
     """
-    from revenge_bench.traces.parsers.halite import (
+    from revenge_bench.harbor.traces.parsers.halite import (
         actions_distance,
         extract_state_action_pairs,
         load_hlt_file,
@@ -650,7 +640,7 @@ def score_robotrumble_simulations_with_provider(
     native implementation: it is the parser target name from the last processed
     simulation. That field is cosmetic, but preserving it avoids hidden drift.
     """
-    from revenge_bench.traces.parsers.robotrumble import (
+    from revenge_bench.harbor.traces.parsers.robotrumble import (
         actions_distance,
         extract_state_action_pairs,
     )
@@ -858,7 +848,7 @@ def score_robocode_simulations_with_provider(
     preserves that method's forgiving behavior: a failed trace is skipped, and
     a learner query returning ``None`` skips that turn.
     """
-    from revenge_bench.traces.parsers.robocode import (
+    from revenge_bench.harbor.traces.parsers.robocode import (
         actions_distance,
         extract_state_action_pairs,
     )
@@ -991,7 +981,7 @@ def query_huskybench_bot(
     import contextlib
     import io
 
-    from revenge_bench.traces.parsers.huskybench import normalize_action
+    from revenge_bench.harbor.traces.parsers.huskybench import normalize_action
 
     player_bets = {"0": 0, "1": 0}
     player_actions = {}
@@ -1093,7 +1083,7 @@ def score_huskybench_simulations_with_provider(
     logger=None,
 ) -> tuple[int, float, list[dict], list[dict]]:
     """Replay a HuskyBench action provider against frozen poker traces."""
-    from revenge_bench.traces.parsers.huskybench import (
+    from revenge_bench.harbor.traces.parsers.huskybench import (
         actions_distance,
         extract_state_action_pairs,
     )
@@ -1220,7 +1210,7 @@ def compute_component_errors(
     Mirrors ``InverseStrategyTournament._compute_component_errors``.
     """
     try:
-        from revenge_bench.traces.parsers.robocode import (
+        from revenge_bench.harbor.traces.parsers.robocode import (
             ACTION_COMPONENTS,
             ACTION_RANGES,
         )

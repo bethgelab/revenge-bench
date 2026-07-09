@@ -36,7 +36,7 @@ COPY wheels/ /tmp/wheels/
 RUN python3 -m pip install --ignore-requires-python --no-deps /tmp/wheels/revenge_bench-*.whl \
  && python3 -m pip install pyyaml tqdm zstandard \
  && rm -rf /tmp/wheels \
- && python3 -I -c "from revenge_bench.traces.parsers import huskybench; print('revenge_bench HuskyBench import OK')"
+ && python3 -I -c "from revenge_bench.harbor.traces.parsers import huskybench; print('revenge_bench HuskyBench import OK')"
 
 RUN mkdir -p /opt/huskybench /opt/revengebench /target /logs/verifier /run /app/output
 

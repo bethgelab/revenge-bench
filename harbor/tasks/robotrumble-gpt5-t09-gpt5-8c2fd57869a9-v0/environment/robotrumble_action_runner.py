@@ -12,7 +12,7 @@ from typing import Any
 
 
 def _robotrumble_parser_dir() -> Path:
-    import revenge_bench.traces.parsers.robotrumble as robotrumble
+    import revenge_bench.harbor.traces.parsers.robotrumble as robotrumble
 
     return Path(robotrumble.__file__).resolve().parent
 

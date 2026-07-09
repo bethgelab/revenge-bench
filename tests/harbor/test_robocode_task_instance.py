@@ -10,7 +10,7 @@ from revenge_bench.arenas.robocode.robocode import RC_FILE, RoboCodeArena
 from revenge_bench.harbor.robocode_task import resolve_task_instance
 from revenge_bench.paths import CONFIG_DIR
 from revenge_bench.strategy_pool import StrategyPool
-from revenge_bench.traces.robocode_probe import robocode_round_battle_content
+from revenge_bench.harbor.traces.robocode_probe import robocode_round_battle_content
 from revenge_bench.utils.yaml_utils import resolve_includes
 
 

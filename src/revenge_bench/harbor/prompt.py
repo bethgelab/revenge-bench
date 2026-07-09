@@ -1,23 +1,9 @@
-"""Single-source prompt rendering for the Harbor route.
+"""Harbor-only prompt rendering.
 
-The Harbor inverse-strategy task text (``instruction.md``) is rendered from the
-**same** Codex prompt templates the native ``inverse_codex`` learner uses:
-
-- ``configs/prompts/codex/system.yaml`` — ``system_template`` + ``instance_template``
-- ``configs/prompts/codex/games/<game>.yaml`` — ``game_description``
-
-Both routes share :func:`revenge_bench.agents.utils.render_prompt_sections` and
-the real :class:`~revenge_bench.agents.utils.GameContext`, so the Harbor
-instruction cannot drift from the native Codex round prompt. A drift test
-(``tests/harbor/test_prompt_parity.py``) asserts the committed ``instruction.md``
-equals a fresh render, mirroring the ``offline_eval`` parity approach.
-
-Route-specific *mechanical* differences (single container vs. multi-round
-sessions, ``sudo run_probe`` vs. the MCP ``run_probe`` tool, ``/workspace``
-paths vs. ``/logs/rounds``) are handled by the shared templates' ``route``
-branch: the Harbor generator renders with ``route="harbor"`` while the native
-learner renders with ``route="codex"``. The game description and scorer
-semantics stay identical across both routes.
+The native benchmark prompt files stay untouched. Harbor keeps its own prompt
+snapshots under ``revenge_bench/harbor/prompts`` and renders them with a small
+local Jinja helper. This intentionally duplicates the native renderer shape so
+Harbor task text can evolve without changing the main Codex pipeline.
 """
 
 from __future__ import annotations
@@ -26,13 +12,16 @@ import argparse
 from pathlib import Path
 
 import yaml
+from jinja2 import StrictUndefined, Template
 
-from revenge_bench.agents.utils import GameContext, render_prompt_sections
-from revenge_bench.paths import CONFIG_DIR, REPO_ROOT
+from revenge_bench.agents.utils import GameContext
+from revenge_bench.paths import REPO_ROOT
 
-# Codex prompt sources (the single source of truth shared with the native path).
-CODEX_SYSTEM_PROMPT = CONFIG_DIR / "prompts" / "codex" / "system.yaml"
-CODEX_GAME_PROMPT_DIR = CONFIG_DIR / "prompts" / "codex" / "games"
+# Harbor prompt sources. They intentionally live under the Harbor package rather
+# than configs/prompts/codex so native prompt files remain main-pipeline-owned.
+HARBOR_PROMPT_DIR = Path(__file__).resolve().parent / "prompts" / "codex"
+HARBOR_SYSTEM_PROMPT = HARBOR_PROMPT_DIR / "system.yaml"
+HARBOR_GAME_PROMPT_DIR = HARBOR_PROMPT_DIR / "games"
 
 # Harbor task directory name -> Codex game-prompt stem.
 HARBOR_TASK_GAMES: dict[str, str] = {
@@ -65,6 +54,18 @@ def _load_yaml(path: Path) -> dict:
     return data
 
 
+def render_prompt_sections(agent_cfg: dict, template_vars: dict) -> list[str]:
+    """Render Harbor ``system_template`` / ``instance_template`` sections."""
+    ctx = {**agent_cfg, **template_vars}
+    sections: list[str] = []
+    for key in ("system_template", "instance_template"):
+        raw = agent_cfg.get(key)
+        if raw:
+            rendered = Template(str(raw), undefined=StrictUndefined).render(**ctx)
+            sections.append(rendered.rstrip())
+    return sections
+
+
 def render_codex_instruction(
     game: str,
     *,
@@ -74,22 +75,16 @@ def render_codex_instruction(
     route: str = DEFAULT_ROUTE,
     round: int = DEFAULT_ROUND,
     rounds: int = DEFAULT_ROUNDS,
-    config_dir: Path = CONFIG_DIR,
+    prompt_dir: Path = HARBOR_PROMPT_DIR,
 ) -> str:
     """Render the inverse-strategy learner prompt for *game* as plain text.
 
-    Reuses the real :class:`GameContext` (variable computation) and
-    :func:`render_prompt_sections` (template rendering), reading the same Codex
-    ``system.yaml`` / ``games/<game>.yaml`` the native path consumes, then joins
-    the sections exactly as ``CodexInverseStrategyAgent._render_round_prompt``.
-
-    ``route`` selects which branch of the shared templates renders: ``"codex"``
-    (native multi-round loop) or ``"harbor"`` (single-session container). Only
-    the loop/tool/path sentences differ; the game description and scorer
-    semantics are identical across routes.
+    ``route`` selects which branch of the Harbor-owned templates renders:
+    ``"codex"`` is kept only for drift tests; production task generation uses
+    ``"harbor"``.
     """
-    system_prompt_path = config_dir / "prompts" / "codex" / "system.yaml"
-    game_prompt_path = config_dir / "prompts" / "codex" / "games" / f"{game}.yaml"
+    system_prompt_path = prompt_dir / "system.yaml"
+    game_prompt_path = prompt_dir / "games" / f"{game}.yaml"
 
     agent_cfg = _load_yaml(system_prompt_path)
     prompts = _load_yaml(game_prompt_path)
@@ -100,15 +95,20 @@ def render_codex_instruction(
         log_local=Path("/logs"),
         name=player_id,
         player_id=player_id,
-        prompts=prompts,
+        prompts={},
         round=round,
         rounds=rounds,
         working_dir=working_dir,
         context_mode=context_mode,
-        route=route,
     )
 
-    sections = render_prompt_sections(agent_cfg, game_context.to_template_vars())
+    template_vars = game_context.to_template_vars()
+    template_vars["route"] = route
+    for key, raw in prompts.items():
+        template_vars[key] = Template(str(raw), undefined=StrictUndefined).render(
+            **template_vars
+        )
+    sections = render_prompt_sections(agent_cfg, template_vars)
     if not sections:
         raise RuntimeError(
             f"no system_template / instance_template found in {system_prompt_path}"
@@ -134,17 +134,19 @@ def game_for_task(task: str) -> str:
     )
 
 
-def render_task_instruction(task: str, *, config_dir: Path = CONFIG_DIR, **kwargs) -> str:
+def render_task_instruction(
+    task: str, *, prompt_dir: Path = HARBOR_PROMPT_DIR, **kwargs
+) -> str:
     """Render the Codex-identical instruction for a Harbor *task* directory."""
     game = game_for_task(task)
-    return render_codex_instruction(game, config_dir=config_dir, **kwargs)
+    return render_codex_instruction(game, prompt_dir=prompt_dir, **kwargs)
 
 
 def generate_instruction(
     task: str = "battlesnake-gpt5-9aa3-v0",
     *,
     harbor_root: Path = REPO_ROOT / "harbor",
-    config_dir: Path = CONFIG_DIR,
+    prompt_dir: Path = HARBOR_PROMPT_DIR,
     write: bool = True,
 ) -> str:
     """Render (and optionally write) a task's ``instruction.md``.
@@ -152,7 +154,7 @@ def generate_instruction(
     Returns the rendered text. When ``write`` is true the text is written to
     ``harbor/tasks/<task>/instruction.md``.
     """
-    text = render_task_instruction(task, config_dir=config_dir)
+    text = render_task_instruction(task, prompt_dir=prompt_dir)
     if write:
         dest = instruction_path(task, harbor_root=harbor_root)
         dest.parent.mkdir(parents=True, exist_ok=True)

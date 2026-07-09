@@ -12,12 +12,12 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from revenge_bench.traces.offline_eval import (
+from revenge_bench.harbor.traces.offline_eval import (
     evaluate_robocode_submission_with_move_provider,
     find_robocode_sim_files,
     robocode_parser_target_name_for_sim,
 )
-from revenge_bench.traces.parsers.robocode import extract_state_action_pairs
+from revenge_bench.harbor.traces.parsers.robocode import extract_state_action_pairs
 
 
 class RoboCodeArtifactMoveProvider:

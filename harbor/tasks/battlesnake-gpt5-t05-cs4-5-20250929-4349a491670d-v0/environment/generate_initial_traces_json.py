@@ -22,7 +22,7 @@ OUT = Path(os.environ.get("BATTLESNAKE_INITIAL_TRACE_JSON", ROUND_DIR / "traces.
 
 
 def main() -> int:
-    from revenge_bench.traces.offline_eval import evaluate_battlesnake_submission
+    from revenge_bench.harbor.traces.offline_eval import evaluate_battlesnake_submission
 
     if not SUBMISSION.exists():
         raise FileNotFoundError(f"missing initial submission: {SUBMISSION}")

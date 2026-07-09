@@ -47,7 +47,7 @@ def _run_one_opponent(opponent: Path, opp_idx: int, sims: int) -> None:
         dest = opp_dir / f"sim_{sim_idx}.hlt"
         shutil.move(str(produced[-1]), dest)
         if target_hlt_name is None:
-            from revenge_bench.traces.parsers.halite import load_hlt_file
+            from revenge_bench.harbor.traces.parsers.halite import load_hlt_file
 
             hlt_data = load_hlt_file(dest)
             player_names = hlt_data.get("player_names", [])

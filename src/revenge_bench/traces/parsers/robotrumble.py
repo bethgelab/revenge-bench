@@ -269,16 +269,8 @@ def actions_distance(a1: Any, a2: Any) -> float:
     Returns:
         Float between 0.0 and 1.0.
     """
-    a1_is_list = isinstance(a1, list)
-    a2_is_list = isinstance(a2, list)
-
-    # One side is a multi-unit action batch and the other is a scalar/missing
-    # action. Treat that as a failed batch, not as two scalar no-ops.
-    if a1_is_list != a2_is_list:
-        return 1.0
-
     # Both lists → multi-unit comparison
-    if a1_is_list and a2_is_list:
+    if isinstance(a1, list) and isinstance(a2, list):
         map1 = {
             entry["unit_id"]: entry.get("action")
             for entry in a1
@@ -488,67 +480,6 @@ def extract_state_action_pairs(
         pairs.append((state, actions))
 
     return pairs
-
-
-def build_probe_trace_payload(
-    simulations: list[tuple[str, dict]],
-    probe_id: int,
-    *,
-    probe_team: str = "Blue",
-    target_team: str = "Red",
-) -> dict[str, Any]:
-    """Build the interventionist probe trace payload from raw simulations.
-
-    This mirrors ``InverseStrategyInterventionist._parse_robotrumble_probe_traces``:
-    the probe bot is Blue, the target is Red, and each pair records both actions
-    plus the target-observed state.
-    """
-    all_pairs: list[dict[str, Any]] = []
-    per_simulation: list[dict[str, Any]] = []
-
-    for sim_name, data in simulations:
-        turns = data.get("turns", [])
-        sim_pairs = []
-
-        for turn_data in turns:
-            turn_num = turn_data.get("turn", 0)
-
-            target_state = extract_player_state(turn_data, target_team)
-            probe_state = extract_player_state(turn_data, probe_team)
-            if target_state is None or probe_state is None:
-                continue
-
-            target_action = extract_player_action(turn_data, target_team)
-            probe_action = extract_player_action(turn_data, probe_team)
-            if target_action is None or probe_action is None:
-                continue
-
-            distance = actions_distance(probe_action, target_action)
-            pair = {
-                "turn": turn_num,
-                "probe_action": probe_action,
-                "target_action": target_action,
-                "distance": distance,
-                "target_state": target_state,
-            }
-            sim_pairs.append(pair)
-            all_pairs.append(pair)
-
-        per_simulation.append(
-            {
-                "file": Path(sim_name).name,
-                "num_turns": len(sim_pairs),
-            }
-        )
-
-    return {
-        "probe_id": probe_id,
-        "description": "probe (Blue) vs target (Red) - showing what each did in same state",
-        "total_turns": len(all_pairs),
-        "num_simulations": len(per_simulation),
-        "per_simulation": per_simulation,
-        "pairs": all_pairs,
-    }
 
 
 # =============================================================================

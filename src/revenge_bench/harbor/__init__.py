@@ -24,9 +24,10 @@ agent
     ``minisweagent`` frameworks) so ``import revenge_bench.harbor`` stays
     dependency-light.
 
-The offline (trace-replay) scoring itself is **not** duplicated here: both the
-native tournament and the in-container verifier import the single source of
-truth at :mod:`revenge_bench.traces.offline_eval`.
+The offline (trace-replay) scoring used by Harbor lives under
+:mod:`revenge_bench.harbor.traces`. It intentionally duplicates the native
+behavior behind Harbor-specific parity tests so the main benchmark pipeline can
+remain unchanged.
 """
 
 from __future__ import annotations

@@ -38,7 +38,7 @@ COPY wheels/ /tmp/wheels/
 RUN python3 -m pip install --no-deps /tmp/wheels/revenge_bench-*.whl \
  && python3 -m pip install pyyaml tqdm zstandard \
  && rm -rf /tmp/wheels \
- && python3 -I -c "from revenge_bench.traces.parsers import robocode; print('revenge_bench RoboCode import OK')"
+ && python3 -I -c "from revenge_bench.harbor.traces.parsers import robocode; print('revenge_bench RoboCode import OK')"
 
 RUN mkdir -p /opt/robocode /opt/revengebench /target /logs/verifier /run
 
