@@ -121,15 +121,22 @@ def instruction_path(task: str, *, harbor_root: Path = REPO_ROOT / "harbor") -> 
     return harbor_root / "tasks" / task / "instruction.md"
 
 
+def game_for_task(task: str) -> str:
+    """Return the Codex game-prompt stem for a pilot or materialized task name."""
+    if task in HARBOR_TASK_GAMES:
+        return HARBOR_TASK_GAMES[task]
+    game = task.split("-", 1)[0]
+    if game in set(HARBOR_TASK_GAMES.values()):
+        return game
+    raise KeyError(
+        f"unknown Harbor task {task!r}; expected a pilot task or a canonical "
+        f"task name starting with one of {sorted(set(HARBOR_TASK_GAMES.values()))}"
+    )
+
+
 def render_task_instruction(task: str, *, config_dir: Path = CONFIG_DIR, **kwargs) -> str:
     """Render the Codex-identical instruction for a Harbor *task* directory."""
-    try:
-        game = HARBOR_TASK_GAMES[task]
-    except KeyError:
-        raise KeyError(
-            f"unknown Harbor task {task!r}; known tasks: "
-            f"{sorted(HARBOR_TASK_GAMES)}"
-        ) from None
+    game = game_for_task(task)
     return render_codex_instruction(game, config_dir=config_dir, **kwargs)
 
 
@@ -159,7 +166,6 @@ def _main(argv: list[str] | None = None) -> int:
         "task",
         nargs="?",
         default="battlesnake-gpt5-9aa3-v0",
-        choices=sorted(HARBOR_TASK_GAMES),
         help="Harbor task directory to (re)generate instruction.md for.",
     )
     parser.add_argument(

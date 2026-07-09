@@ -77,7 +77,7 @@ def _run(argv: list[str]) -> int:
     payload["probes_remaining"] = remaining - 1
     out = WORKSPACE / f"probe_trace_{probe_id}.json"
     out.write_text(json.dumps(payload, indent=2) + "\n")
-    os.chown(out, 1000, 1000)
+    shutil.chown(out, user="agent", group="agent")
     print(json.dumps(payload, indent=2))
     return 0
 

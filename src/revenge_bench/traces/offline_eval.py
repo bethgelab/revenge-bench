@@ -482,6 +482,7 @@ def score_halite_simulations_with_provider(
     target_hlt_name: str,
     action_provider: Callable[[dict, int], list],
     *,
+    max_nonzero_distances: int | None = None,
     logger=None,
 ) -> tuple[int, float, list[dict], list[dict]]:
     """Replay a learner action provider against Halite I target traces.
@@ -537,7 +538,11 @@ def score_halite_simulations_with_provider(
                         "state": target_state,
                     }
                     sim_nonzero.append(entry)
-                    all_nonzero.append(entry)
+                    if (
+                        max_nonzero_distances is None
+                        or len(all_nonzero) < max_nonzero_distances
+                    ):
+                        all_nonzero.append(entry)
 
             total_actions += sim_total
             total_distance += sim_distance
@@ -573,6 +578,7 @@ def evaluate_halite_submission_with_action_provider(
     logger=None,
     evaluation_type: str = "offline_subprocess",
     include_diagnostics: bool = False,
+    max_nonzero_distances: int | None = None,
 ) -> dict[str, Any]:
     """Score Halite I traces using a caller-supplied compiled-bot provider."""
 
@@ -586,6 +592,7 @@ def evaluate_halite_submission_with_action_provider(
             round_dir,
             target_hlt_name,
             action_provider,
+            max_nonzero_distances=max_nonzero_distances,
             logger=logger,
         )
     )

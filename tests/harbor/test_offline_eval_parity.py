@@ -254,6 +254,33 @@ def test_halite_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path):
     )
 
 
+def test_halite_shared_scorer_can_cap_nonzero_diagnostics(tmp_path: Path):
+    from revenge_bench.traces.offline_eval import (
+        evaluate_halite_submission_with_action_provider,
+    )
+
+    round_dir = tmp_path / "halite" / "rounds" / "0"
+    _write_halite_round(round_dir, "target")
+
+    payload = evaluate_halite_submission_with_action_provider(
+        round_dir=round_dir,
+        round_num=0,
+        target_hlt_name="target",
+        learner_name="learner",
+        action_provider=lambda _hlt_data, _player_tag: [
+            [[0, 0, 2]],
+            [[0, 0, 0]],
+        ],
+        evaluation_type="offline_subprocess",
+        max_nonzero_distances=1,
+    )
+
+    assert payload["total_actions"] == 2
+    assert payload["mean_distance"] == 1.0
+    assert payload["per_simulation"][0]["num_nonzero"] == 2
+    assert len(payload["nonzero_distances"]) == 1
+
+
 def test_robocode_tournament_and_shared_scorer_are_byte_identical(tmp_path: Path):
     from unittest.mock import patch
 
@@ -563,7 +590,8 @@ def test_huskybench_tournament_and_shared_scorer_are_byte_identical(tmp_path: Pa
     submission.parent.mkdir(parents=True)
     submission.write_text("# scorer provider is patched in this test\n")
 
-    provider = lambda _state: "CHECK"
+    def provider(_state):
+        return "CHECK"
 
     tournament = MagicMock(spec=InverseStrategyTournament)
     tournament.learner_agent = MagicMock()

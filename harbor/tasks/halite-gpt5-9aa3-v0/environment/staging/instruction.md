@@ -23,7 +23,6 @@ Main file must be named `main.<ext>`. See `airesources/` for example implementat
 See `runGame.sh` under `submission/<language>/` for compile/run instructions.
 
 ## How It Works (IMPORTANT)
-
 You work in ONE container session (no rounds):
 1. You PROBE the sealed target to test hypotheses about its behavior
 2. You EDIT your submission based on probe results + visible traces

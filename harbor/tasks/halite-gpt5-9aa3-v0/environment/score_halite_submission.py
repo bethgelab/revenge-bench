@@ -20,6 +20,8 @@ from revenge_bench.traces.offline_eval import (
 )
 from revenge_bench.traces.parsers.halite import load_hlt_file
 
+MAX_NONZERO_DISTANCES = 200
+
 
 def _target_hlt_name_for(sim_file: Path) -> str:
     name_file = sim_file.parent / "_target_hlt_name.txt"
@@ -210,16 +212,24 @@ def evaluate(
         action_provider=provider,
         evaluation_type="offline_artifact",
         include_diagnostics=True,
+        max_nonzero_distances=MAX_NONZERO_DISTANCES,
     )
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "eval.json").write_text(json.dumps(payload, indent=2) + "\n")
 
     mean_distance = payload.get("mean_distance")
     if not isinstance(mean_distance, (int, float)) or not math.isfinite(mean_distance):
         reward = 0.0
     else:
         reward = 1.0 - float(mean_distance)
+    out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "reward.txt").write_text(f"{reward}\n")
+    total_nonzero = sum(
+        int(sim.get("num_nonzero", 0)) for sim in payload.get("per_simulation", [])
+    )
+    if total_nonzero > len(payload.get("nonzero_distances", [])):
+        payload["nonzero_distances_truncated"] = True
+        payload["nonzero_distances_total"] = total_nonzero
+        payload["nonzero_distances_limit"] = MAX_NONZERO_DISTANCES
+    (out_dir / "eval.json").write_text(json.dumps(payload, indent=2) + "\n")
     return payload
 
 

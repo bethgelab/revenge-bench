@@ -20,6 +20,7 @@ rm -rf "$WHEELS" "$STAGING"
 mkdir -p "$WHEELS" "$STAGING"
 
 ( cd "$REPO_ROOT" && uv build --wheel -o "$WHEELS" )
+( cd "$REPO_ROOT" && uv run python -m revenge_bench.harbor.prompt "$(basename "$HERE")" )
 ( cd "$REPO_ROOT" && uv run python -m revenge_bench.harbor.battlesnake_task stage "$HERE" )
 
 echo "staged wheel(s) in $WHEELS:"

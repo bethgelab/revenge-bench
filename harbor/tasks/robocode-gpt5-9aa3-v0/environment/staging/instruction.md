@@ -157,7 +157,7 @@ You modify the Java bot in `probe/` to create specific game situations, then run
 2. Run `sudo run_probe` — the system will play your probe bot against the target
 3. Read the results to see how the target responded in the situations your probe created
 
-You get up to 5 probes per round. The remaining budget is tracked in `/workspace/.probe_budget`. **Aim to use at least 2 per round.**
+You have a bounded total probe budget for this single session. The remaining budget is tracked in `/workspace/.probe_budget`, and each successful `sudo run_probe` decrements it. **Spend it deliberately — aim to use several probes before finalizing main.py.**
 
 ### CRITICAL: Separate Exploration from Exploitation
 

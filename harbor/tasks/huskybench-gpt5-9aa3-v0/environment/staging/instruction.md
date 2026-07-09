@@ -103,7 +103,6 @@ where S is the actor's stack at the decision. An all-in is always
 distance 1 from CHECK, at any stack size.
 
 ## How It Works (IMPORTANT)
-
 This Harbor task is one continuous session:
 1. You start with visible round-0 target-vs-opponent traces and the starter's `traces.json`
 2. You can run controlled probes with `sudo run_probe`
@@ -158,7 +157,7 @@ You modify it to create the test scenario you want, then run `sudo run_probe`.
 2. Run `sudo run_probe` — the system will play your probe against the target
 3. Read the results to see what the target did in the situations your probe created
 
-You get a limited total probe budget for the session. **Aim to use probes deliberately and analyze each result.**
+You have a bounded total probe budget for this single session. The remaining budget is tracked in `/workspace/.probe_budget`, and each successful `sudo run_probe` decrements it. **Aim to use probes deliberately and analyze each result.**
 
 ### CRITICAL: Separate Exploration from Exploitation
 

@@ -11,7 +11,7 @@ rm -rf "$WHEELS" "$STAGING"
 mkdir -p "$WHEELS" "$STAGING"
 
 ( cd "$REPO_ROOT" && uv build --wheel -o "$WHEELS" )
-( cd "$REPO_ROOT" && uv run python -m revenge_bench.harbor.prompt robotrumble-gpt5-9aa3-v0 )
+( cd "$REPO_ROOT" && uv run python -m revenge_bench.harbor.prompt "$(basename "$HERE")" )
 ( cd "$REPO_ROOT" && uv run python -m revenge_bench.harbor.robotrumble_task stage "$HERE" )
 
 echo "staged wheel(s) in $WHEELS:"

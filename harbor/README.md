@@ -14,6 +14,31 @@ MLS-Bench keeps its Harbor packaging separate from the main library.
 | `run.yaml` | Example Harbor job config (`harbor run -c run.yaml`) for the public built-in `codex` agent path. |
 | `tasks/*-gpt5-9aa3-v0/` | Deployable, sealed interactive inverse-strategy tasks (Dockerfile, `task.toml`, `run_probe` oracle, verifier `tests/`). |
 
+## Generating the full task set
+
+The five `*-gpt5-9aa3-v0` directories are the manually audited pilot templates,
+one per game. The canonical public task set is generated from the same
+normal-path top-15 target selection used by the benchmark:
+
+```bash
+uv run python -m revenge_bench.harbor.materialize --force
+```
+
+This creates `5 x 15 = 75` concrete task directories under `harbor/tasks/`,
+with unique `task.toml` names/images and `task_config.json` values. By default
+it does not stage duplicated target/opponent files into every Docker context.
+When preparing images, add `--stage`:
+
+```bash
+uv run python -m revenge_bench.harbor.materialize --force --stage
+```
+
+For quick checks or a single game:
+
+```bash
+uv run python -m revenge_bench.harbor.materialize --game robotrumble --target-count 2 --force
+```
+
 ## Security model
 
 Each task uses the single-container, Unix-user sealing design proven in
