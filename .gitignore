@@ -51,6 +51,8 @@ parts/
 sdist/
 var/
 wheels/
+!harbor/tasks/*/environment/wheels/
+!harbor/tasks/*/environment/wheels/*.whl
 share/python-wheels/
 harbor/jobs/
 jobs/
