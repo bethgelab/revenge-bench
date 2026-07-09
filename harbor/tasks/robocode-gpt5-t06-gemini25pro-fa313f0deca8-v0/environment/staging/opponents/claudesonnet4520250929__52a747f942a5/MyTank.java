@@ -1,0 +1,279 @@
+package custom;
+
+import robocode.*;
+import java.awt.Color;
+import static robocode.util.Utils.normalRelativeAngleDegrees;
+
+public class MyTank extends AdvancedRobot {
+    private double enemyBearing;
+    private double enemyDistance;
+    private double enemyEnergy = 100;
+    private double previousEnemyVelocity = 0;
+    private int moveDirection = 1;
+    private boolean hasTarget = false;
+    private int ticksSinceDirectionChange = 0;
+    private double moveSpeed = 1.0; // New: variable speed
+    
+    public void run() {
+        // Set colors
+        setBodyColor(new Color(0, 200, 0));
+        setGunColor(new Color(0, 150, 0));
+        setRadarColor(new Color(0, 255, 0));
+        setBulletColor(new Color(255, 255, 0));
+        setScanColor(new Color(255, 255, 0));
+        
+        // Independent gun and radar movement
+        setAdjustGunForRobotTurn(true);
+        setAdjustRadarForGunTurn(true);
+        
+        // Main loop
+        while (true) {
+            // If we don't have a target, spin radar
+            if (!hasTarget) {
+                setTurnRadarRight(360);
+            }
+            
+            // More frequent direction changes for unpredictability (30-50 ticks instead of 40-60)
+            ticksSinceDirectionChange++;
+            int changeInterval = 30 + (int)(Math.random() * 20);
+            if (ticksSinceDirectionChange > changeInterval) {
+                moveDirection *= -1;
+                // Also vary speed randomly for more unpredictability
+                moveSpeed = 0.7 + Math.random() * 0.6; // Range: 0.7 to 1.3
+                ticksSinceDirectionChange = 0;
+            }
+            
+            execute();
+        }
+    }
+    
+    public void onScannedRobot(ScannedRobotEvent e) {
+        hasTarget = true;
+        
+        // Track the enemy
+        enemyBearing = e.getBearing();
+        enemyDistance = e.getDistance();
+        double enemyAbsoluteBearing = getHeading() + enemyBearing;
+        
+        // Lock radar on target
+        double radarTurn = normalRelativeAngleDegrees(enemyAbsoluteBearing - getRadarHeading());
+        setTurnRadarRight(radarTurn * 2);
+        
+        // Movement strategy: perpendicular movement with smart wall avoidance
+        double moveAngle = normalRelativeAngleDegrees(enemyBearing + 90 - (15 * moveDirection));
+        
+        // Check for walls and adjust movement with smooth transition
+        double wallAvoidanceAngle = getSmartWallAvoidanceAngle(enemyAbsoluteBearing);
+        if (wallAvoidanceAngle != 0) {
+            // Blend wall avoidance with normal movement
+            double wallInfluence = getWallProximityFactor();
+            moveAngle = moveAngle * (1 - wallInfluence) + wallAvoidanceAngle * wallInfluence;
+        }
+        
+        setTurnRight(moveAngle);
+        
+        // Dynamic movement based on distance with variable speed
+        double moveDistance = 100 * moveDirection * moveSpeed;
+        
+        if (enemyDistance > 200) {
+            // Move closer if far away
+            setAhead(moveDistance);
+        } else if (enemyDistance < 100) {
+            // Back away if too close
+            setBack(100 * moveSpeed);
+        } else {
+            // Optimal range: strafe with variable speed
+            setAhead(moveDistance);
+        }
+        
+        // Detect enemy fire and change direction
+        double energyDrop = enemyEnergy - e.getEnergy();
+        if (energyDrop > 0 && energyDrop <= 3) {
+            // Enemy fired, change direction immediately
+            moveDirection *= -1;
+            moveSpeed = 0.8 + Math.random() * 0.5; // Quick speed change too
+            ticksSinceDirectionChange = 0;
+        }
+        enemyEnergy = e.getEnergy();
+        
+        // Aiming: refined predictive targeting with conservative acceleration consideration
+        double bulletPower = calculateBulletPower(enemyDistance, e.getEnergy());
+        double bulletSpeed = 20 - 3 * bulletPower;
+        double timeToHit = enemyDistance / bulletSpeed;
+        
+        // Predict enemy position with improved calculation
+        double enemyHeadingRadians = e.getHeadingRadians();
+        double enemyVelocity = e.getVelocity();
+        
+        // Calculate lateral velocity (perpendicular to our line of sight)
+        double lateralVelocity = enemyVelocity * Math.sin(enemyHeadingRadians - Math.toRadians(enemyAbsoluteBearing));
+        
+        // Consider enemy acceleration for better prediction (more conservative)
+        double enemyAcceleration = enemyVelocity - previousEnemyVelocity;
+        previousEnemyVelocity = enemyVelocity;
+        
+        // Refined prediction with conservative acceleration factor and bounds checking
+        // Use 0.3 instead of 0.5 for more conservative acceleration adjustment
+        double accelerationAdjustment = enemyAcceleration * timeToHit * 0.3;
+        // Limit acceleration adjustment to prevent wild predictions
+        accelerationAdjustment = Math.max(-2, Math.min(2, accelerationAdjustment));
+        
+        double predictedLateralVelocity = lateralVelocity + accelerationAdjustment;
+        double predictedBearing = enemyAbsoluteBearing + (predictedLateralVelocity * timeToHit / enemyDistance);
+        
+        // Aim gun
+        double gunTurn = normalRelativeAngleDegrees(predictedBearing - getGunHeading());
+        setTurnGunRight(gunTurn);
+        
+        // Fire when gun is aimed and cooled down
+        if (Math.abs(gunTurn) < 10 && getGunHeat() == 0 && bulletPower > 0) {
+            setFire(bulletPower);
+        }
+    }
+    
+    private double getWallProximityFactor() {
+        // Returns 0-1 indicating how close we are to a wall
+        // 0 = far from walls, 1 = very close to wall
+        double margin = 80;
+        double criticalMargin = 30;
+        
+        double x = getX();
+        double y = getY();
+        double fieldWidth = getBattleFieldWidth();
+        double fieldHeight = getBattleFieldHeight();
+        
+        double minDistance = Math.min(
+            Math.min(x, fieldWidth - x),
+            Math.min(y, fieldHeight - y)
+        );
+        
+        if (minDistance > margin) {
+            return 0; // Not close to wall
+        } else if (minDistance < criticalMargin) {
+            return 1; // Very close to wall
+        } else {
+            // Smooth transition
+            return (margin - minDistance) / (margin - criticalMargin);
+        }
+    }
+    
+    private double getSmartWallAvoidanceAngle(double enemyAbsoluteBearing) {
+        double x = getX();
+        double y = getY();
+        double fieldWidth = getBattleFieldWidth();
+        double fieldHeight = getBattleFieldHeight();
+        
+        // Find which wall is closest
+        double distLeft = x;
+        double distRight = fieldWidth - x;
+        double distTop = fieldHeight - y;
+        double distBottom = y;
+        
+        double minDist = Math.min(Math.min(distLeft, distRight), Math.min(distTop, distBottom));
+        
+        // If not close to any wall, return 0
+        if (minDist > 80) {
+            return 0;
+        }
+        
+        // Determine escape angle based on which wall is closest
+        double escapeAngle;
+        
+        if (minDist == distLeft) {
+            // Too close to left wall, move right
+            escapeAngle = 90; // East
+        } else if (minDist == distRight) {
+            // Too close to right wall, move left
+            escapeAngle = 270; // West
+        } else if (minDist == distTop) {
+            // Too close to top wall, move down
+            escapeAngle = 180; // South
+        } else {
+            // Too close to bottom wall, move up
+            escapeAngle = 0; // North
+        }
+        
+        // Adjust escape angle to avoid moving directly toward enemy
+        double angleToEnemy = enemyAbsoluteBearing;
+        double angleDiff = normalRelativeAngleDegrees(escapeAngle - angleToEnemy);
+        
+        // If escape angle is too close to enemy direction, adjust perpendicular
+        if (Math.abs(angleDiff) < 45) {
+            // Move perpendicular to enemy instead
+            escapeAngle = angleToEnemy + (angleDiff > 0 ? 90 : -90);
+        }
+        
+        return normalRelativeAngleDegrees(escapeAngle - getHeading());
+    }
+    
+    private double calculateBulletPower(double distance, double enemyEnergy) {
+        // More aggressive energy management when we have advantage
+        double myEnergy = getEnergy();
+        double energyAdvantage = myEnergy - enemyEnergy;
+        
+        // Don't fire if we're very low on energy
+        if (myEnergy < 5) {
+            return 0.1;
+        }
+        
+        // Be more conservative when energy is low
+        if (myEnergy < 15) {
+            if (enemyEnergy < 4) {
+                return 2; // Still try to finish them
+            }
+            return 1; // Conserve energy
+        }
+        
+        // Be more aggressive when we have significant energy advantage
+        if (energyAdvantage > 30) {
+            if (enemyEnergy < 4) {
+                return 3; // Finish them off
+            } else if (distance < 150) {
+                return 3; // Close range with advantage, high power
+            } else if (distance < 300) {
+                return 2.5; // Medium range with advantage
+            } else {
+                return 2; // Long range but still aggressive
+            }
+        }
+        
+        // Adaptive bullet power based on distance and enemy energy
+        if (enemyEnergy < 4) {
+            return 3; // Finish them off
+        } else if (distance < 100) {
+            return 3; // Close range, high power
+        } else if (distance < 300) {
+            return 2; // Medium range, medium power
+        } else {
+            return 1; // Long range, conserve energy
+        }
+    }
+    
+    public void onHitByBullet(HitByBulletEvent e) {
+        // Change direction when hit
+        moveDirection *= -1;
+        moveSpeed = 0.8 + Math.random() * 0.5; // Random speed change
+        ticksSinceDirectionChange = 0;
+        setAhead(100 * moveDirection * moveSpeed);
+    }
+    
+    public void onHitWall(HitWallEvent e) {
+        // Reverse direction when hitting wall
+        moveDirection *= -1;
+        ticksSinceDirectionChange = 0;
+        setBack(100);
+    }
+    
+    public void onHitRobot(HitRobotEvent e) {
+        // If we hit an enemy, fire and back up
+        if (e.isMyFault()) {
+            setFire(3);
+            setBack(100);
+        }
+    }
+    
+    public void onRobotDeath(RobotDeathEvent e) {
+        // Lost our target
+        hasTarget = false;
+    }
+}

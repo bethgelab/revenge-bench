@@ -1,0 +1,15 @@
+{
+  "source_path": "data/extracted_strategies/RoboCode/PvpTournament.RoboCode.r15.s250.p2.claudesonnet420250514.claudesonnet4520250929.251011064336/final/claudesonnet420250514",
+  "model": "claudesonnet420250514",
+  "complexity_score": 15.6,
+  "tier": "low",
+  "content_hash": "8a399fce4996",
+  "replaces": "gemini25pro__e5da7fc4da43",
+  "replacement_reason": "Original failed Java compilation in RoboCode arena",
+  "elo": 1481.4,
+  "elo_rank": 27,
+  "elo_total": 40,
+  "elo_win_rate": 0.467,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}

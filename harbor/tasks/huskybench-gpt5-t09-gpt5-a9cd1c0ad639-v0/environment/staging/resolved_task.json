@@ -1,0 +1,32 @@
+{
+  "benchmark_config": "configs/benchmark/gpt5/gpt5_huskybench.yaml",
+  "target_index": 9,
+  "target_name": "gpt5__a9cd1c0ad639",
+  "target_path": "data/targets/huskybench/gpt5__a9cd1c0ad639",
+  "opponents": [
+    "data/targets/huskybench/gpt5-mini__563b7a8fa4d0",
+    "data/targets/huskybench/o3__7277047ef5e2",
+    "data/targets/huskybench/qwen3-coder-plus-2025-09-23__17b9476a725b",
+    "data/targets/huskybench/gemini-2.5-pro__458429b9baf8",
+    "data/targets/huskybench/qwen3-coder-plus-2025-09-23__e8ac03f320f7",
+    "data/targets/huskybench/gemini-2.5-pro__e413f80bbce3",
+    "data/targets/huskybench/gpt5-mini__5d14efe5aa55",
+    "data/targets/huskybench/grok-code-fast-1__81b581b41bd0",
+    "data/targets/huskybench/gpt5-mini__5eb04979f470",
+    "data/targets/huskybench/o3__9015614a1a48",
+    "data/targets/huskybench/grok-code-fast-1__104f6bb227b3",
+    "data/targets/huskybench/gpt5__b950e7a98639",
+    "data/targets/huskybench/o3__1146a321d226",
+    "data/targets/huskybench/qwen3-coder-plus-2025-09-23__c74ccff66ff5",
+    "data/targets/huskybench/gpt5__11f6e74a9700",
+    "data/targets/huskybench/qwen3-coder-plus-2025-09-23__a3a7162fd199",
+    "data/targets/huskybench/gpt5-mini__b31f4eb4a244",
+    "data/targets/huskybench/gpt5__a61e02304fce",
+    "data/targets/huskybench/gemini-2.5-pro__53a9af073ce8",
+    "data/targets/huskybench/gemini-2.5-pro__abcfd78923af"
+  ],
+  "opponents_per_round": 20,
+  "sims_per_round": 400,
+  "seed": 42,
+  "top_elo_targets": 15
+}

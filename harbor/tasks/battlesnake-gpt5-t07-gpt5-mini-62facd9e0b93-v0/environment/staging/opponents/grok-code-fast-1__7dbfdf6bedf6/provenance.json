@@ -1,0 +1,28 @@
+{
+  "source": "codeclash_viewer",
+  "game": "BattleSnake",
+  "model": "grok-code-fast-1",
+  "tournament": "PvpTournament.BattleSnake.r15.s1000.p2.claude-sonnet-4-20250514.grok-code-fast-1.251002081754",
+  "source_path": "data/extracted_strategies/BattleSnake/PvpTournament.BattleSnake.r15.s1000.p2.claude-sonnet-4-20250514.grok-code-fast-1.251002081754/final/grok-code-fast-1",
+  "lines": 169,
+  "content_hash": "7dbfdf6bedf6",
+  "complexity_score": 47.5,
+  "complexity_tier": "low",
+  "complexity_breakdown": {
+    "total": 47.5,
+    "loc": 169,
+    "func_count": 4,
+    "max_nesting_depth": 5,
+    "branch_count": 35,
+    "node_count": 1117,
+    "algorithm_score": 0,
+    "algorithms_found": [],
+    "data_structure_score": 0
+  },
+  "elo": 1505.2,
+  "elo_rank": 17,
+  "elo_total": 40,
+  "elo_win_rate": 0.333,
+  "elo_matches": 15,
+  "elo_tier": "medium"
+}
