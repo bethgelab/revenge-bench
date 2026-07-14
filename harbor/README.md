@@ -1,162 +1,146 @@
-# RevengeBench × Harbor (Tier I)
+# Running RevengeBench Tasks With Harbor
 
-This directory packages RevengeBench's inverse-strategy evaluation as
-self-contained [Harbor](https://github.com/harbor-framework/harbor) tasks. It is
-**purely additive** — nothing in the core `revenge_bench` package depends on it,
-and no existing tournament or agent code is modified. The layout mirrors how
-MLS-Bench keeps its Harbor packaging separate from the main library.
+This directory contains self-contained
+[Harbor](https://github.com/harbor-framework/harbor) tasks for RevengeBench.
+Each task packages one sealed inverse-strategy problem: the agent can inspect
+the task workspace, use the bounded `run_probe` oracle, and submit code that is
+scored by the task verifier.
 
-## Contents
+These Harbor tasks are an artifact format for running RevengeBench with Harbor.
+They are separate from the main RevengeBench pipeline.
+
+## Requirements
+
+- Docker
+- Harbor
+- Credentials for the model provider used by your Harbor agent
+
+Install Harbor in the environment you will use to launch runs. For example:
+
+```bash
+uv tool install harbor
+```
+
+Run the commands below from this directory:
+
+```bash
+cd harbor
+```
+
+## Run With a Published Image
+
+Once RevengeBench task images are published, Harbor can pull the image named in
+the task's `task.toml` automatically. For example:
+
+```bash
+export OPENAI_API_KEY=...
+
+harbor run \
+    -p tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0 \
+    -a codex \
+    -m gpt-5.4-mini \
+    --allow-agent-host api.openai.com
+```
+
+The task image disables general internet access. `--allow-agent-host` only lets
+the Harbor agent process reach the model API host; it does not give the task
+container open internet access.
+
+You can also use the example config:
+
+```bash
+harbor run -c run.yaml
+```
+
+The images have not been pushed yet. Until they are available remotely, use the
+source-build path below.
+
+## Build From Source
+
+For local source builds, stage the task's Docker build context first:
+
+```bash
+./tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0/build_context.sh
+```
+
+Then run Harbor with `--force-build`:
+
+```bash
+harbor run \
+    -p tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0 \
+    -a codex \
+    -m gpt-5.4-mini \
+    --allow-agent-host api.openai.com \
+    --force-build
+```
+
+The build context includes the task Dockerfile, target/opponent assets, and a
+local `revenge_bench` wheel under `environment/wheels/`. If you change task
+metadata, scoring code, trace parsing, prompts, or staged assets, rerun the
+task's `build_context.sh` before building again.
+
+## Running a No-Op Smoke Test
+
+Use Harbor's `nop` agent to check that a task builds and verifies without
+spending model calls:
+
+```bash
+./tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0/build_context.sh
+
+harbor run \
+    -p tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0 \
+    -a nop \
+    --force-build
+```
+
+This tests the packaged starter workspace and verifier path. It is not an agent
+solving run.
+
+## Task Layout
+
+Each task directory contains:
 
 | Path | Purpose |
 | --- | --- |
-| `harbor_agent.py` | Optional entry-point shim. Lazily exposes `HarborRevengeAgent` (implemented in `revenge_bench.harbor.agent`) for internal parity runs. Public artifact runs use normal Harbor agents such as `codex`. |
-| `run.yaml` | Example Harbor job config (`harbor run -c run.yaml`) for the public built-in `codex` agent path. |
-| `tasks/*-gpt5-9aa3-v0/` | Deployable, sealed interactive inverse-strategy tasks (Dockerfile, `task.toml`, `run_probe` oracle, verifier `tests/`). |
+| `task.toml` | Harbor task metadata, resource limits, and Docker image name. |
+| `instruction.md` | Agent-facing task instructions. |
+| `environment/` | Docker build context and trusted task runtime files. |
+| `tests/` | Verifier entry point run by Harbor after the agent finishes. |
+| `build_context.sh` | Rebuilds the local source-build context for that task. |
 
-## Generating the full task set
+Runtime outputs are written under `harbor/jobs/` and are ignored by Git.
 
-The five `*-gpt5-9aa3-v0` directories are the manually audited pilot templates,
-one per game. The canonical public task set is generated from the same
-normal-path top-15 target selection used by the benchmark:
+## Generating or Restaging Tasks
+
+The repository includes one task per benchmark target. Maintainers can
+regenerate the task set with:
 
 ```bash
 uv run python -m revenge_bench.harbor.materialize --force
 ```
 
-This creates `5 x 15 = 75` concrete task directories under `harbor/tasks/`,
-with unique `task.toml` names/images and `task_config.json` values. By default
-it does not stage duplicated target/opponent files into every Docker context.
-When preparing images, add `--stage`:
+To regenerate and stage local source-build contexts for all tasks:
 
 ```bash
 uv run python -m revenge_bench.harbor.materialize --force --stage
 ```
 
-For quick checks or a single game:
+For a smaller subset:
 
 ```bash
-uv run python -m revenge_bench.harbor.materialize --game robotrumble --target-count 2 --force
+uv run python -m revenge_bench.harbor.materialize --game robotrumble --target-count 2 --force --stage
 ```
 
-## Source-build fallback
+## Security Model
 
-The intended public path is to pull prebuilt task images once they are published
-to Docker Hub. If you instead want Harbor or Docker to build a task image from
-this repository, first stage the local build context for that task:
+Each task uses a single-container sealed-target design:
 
-```bash
-./tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0/build_context.sh
-harbor run -p tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0 -a nop --force-build
-```
+- The agent runs as the non-root `agent` user in `/workspace`.
+- The target is sealed at `/target` and is readable only by root.
+- Agents interact with the target through the bounded `sudo run_probe` oracle.
+- The verifier runs after the agent session and scores held-out behavior.
+- General task internet access is disabled.
 
-For the whole generated task set, stage during materialization:
-
-```bash
-uv run python -m revenge_bench.harbor.materialize --force --stage
-```
-
-This matters because generated Docker contexts do not fetch `revenge_bench` from
-PyPI. They install the wheel staged under each task's `environment/wheels/`, plus
-the staged target/opponent assets under `environment/staging/`. Building from an
-unstaged or stale context can produce images whose verifier imports fail, even
-though the task directory itself looks complete. Rerun the task's
-`build_context.sh` after changing Harbor scoring, trace parsing, prompts, task
-metadata, or target/opponent staging.
-
-## Security model
-
-Each task uses the single-container, Unix-user sealing design proven in
-AgenticPIC:
-
-- The **agent** runs as the non-root `agent` user (UID 1000) in `/workspace`.
-- The **target** is sealed at `/target` (`root:root`, mode `0700`) and is
-  reachable only through `sudo run_probe`, a budget-limited oracle that runs the
-  agent's probe code unprivileged and the trusted target as root, on random
-  loopback ports never revealed to the agent.
-- The probe budget is task-owned. Each image bakes `/workspace/.probe_budget`,
-  and `sudo run_probe` is responsible for decrementing/enforcing it. Agents and
-  agent bridges do not seed or reset the budget.
-- Scoring is offline and separate: the verifier (`tests/test.sh`) generates
-  hidden target-vs-opponent traces, asks the learner policy for actions via an
-  unprivileged artifact runner, and emits a reward.
-
-`HarborRevengeAgent` itself runs **outside** the container and drives the task
-through Harbor's `BaseEnvironment.exec()`, adapting the async environment to the
-synchronous interface expected by mini-swe-agent's `DefaultAgent`. It is optional
-and exists for RevengeBench/mini-swe-agent loop parity; probe control stays in
-the task image either way.
-
-## Environment setup
-
-Harbor and `revenge_bench` must be importable in the same Python environment.
-Two supported options:
-
-1. **Inject `revenge_bench` into the Harbor tool environment** (keeps Harbor as
-   a `uv` tool):
-
-   ```bash
-   uv tool install harbor --with /Users/babak/vs_code/revenge-bench
-   ```
-
-2. **Install Harbor into the project `.venv`** alongside `revenge_bench`:
-
-   ```bash
-   uv pip install harbor
-   ```
-
-Either way, run Harbor commands from *this* `harbor/` directory so the
-`harbor_agent` shim is on `sys.path`.
-
-## Running
-
-```bash
-cd harbor
-
-# Provider credentials follow normal Harbor practice: export them in the
-# launching shell. Do not hard-code secrets in task files or run configs.
-export OPENAI_API_KEY=...
-
-# Using the example job config, equivalent to the command below:
-harbor run -c run.yaml
-
-# Public Harbor-style run with a built-in Harbor agent:
-harbor run \
-    -p tasks/battlesnake-gpt5-9aa3-v0 \
-    -a codex \
-    -m gpt-5.4-mini \
-    --allow-agent-host api.openai.com
-
-# Optional internal parity run via the RevengeBench bridge:
-harbor run \
-    -p tasks/battlesnake-gpt5-9aa3-v0 \
-    -a harbor_agent:HarborRevengeAgent \
-    -m openai/gpt-5 \
-    --agent-kwarg "step_limit=150"
-```
-
-The task images keep general internet disabled. `--allow-agent-host
-api.openai.com` is a narrow egress exception for the Harbor agent's model API
-traffic only; it is not a task-level open-internet grant. If you prefer local
-dotenv files during development, `--env-file ../.env` is equivalent to exporting
-`OPENAI_API_KEY` before launching Harbor.
-
-### Agent kwargs
-
-`HarborRevengeAgent` accepts the following `--agent-kwarg` (`--ak`) values:
-
-| Kwarg | Default | Meaning |
-| --- | --- | --- |
-| `step_limit` | `150` | Max think→command steps. |
-| `cost_limit` | `5.0` | Max model spend (USD). |
-| `api_base` | env | Override the model API base URL. |
-| `api_key` | env | Override the model API key. |
-| `reasoning_effort` | `medium` | Reasoning effort for capable models. |
-
-The model is selected with `-m/--model` and passed through to mini-swe-agent's
-`get_model`.
-
-Older bridge commands that pass `max_probes` are accepted for compatibility, but
-the value is ignored. The authoritative probe budget is the one baked into the
-task image and enforced by `sudo run_probe`, matching the AgenticPIC-style
-artifact pattern.
+The Harbor tasks are intended to expose the same inverse-strategy problem shape
+as the main benchmark while making it easier to run with Harbor-compatible
+agents and scaffolds.
