@@ -49,6 +49,11 @@ RevengeBench-specific package in `src/revenge_bench`.
 
 ## News
 
+**2026-07**: Added Harbor task artifacts for running RevengeBench tasks with
+Harbor-compatible agents and scaffolds. See the
+[Harbor run guide](harbor/README.md). Exact reproduction of the benchmark
+results should still use the main pipeline below.
+
 **2026-07**: RevengeBench was accepted to the Second Workshop on Agents in the
 Wild: Safety, Security, and Beyond (AIWILD) at ICML 2026. See the
 [OpenReview page](https://openreview.net/forum?id=KTnZYPgaQz).
@@ -115,6 +120,17 @@ bash scripts/run_forward_pvp.sh \
 ```
 
 </details>
+
+## Harbor Task Artifacts
+
+RevengeBench also includes self-contained Harbor task artifacts under
+[`harbor/`](harbor/). These package the inverse-strategy tasks as Docker-backed
+Harbor tasks so users can run them with Harbor-compatible agents and scaffolds.
+
+The Harbor interface is an additional supported way to interact with the tasks.
+For exact reproduction of the benchmark results, use the main RevengeBench
+pipeline above. For Harbor setup, image-pull runs, and source-build fallback
+instructions, see the [Harbor README](harbor/README.md).
 
 ## Optional Tracks
 
@@ -187,6 +203,7 @@ revenge-bench/
 │   ├── prompts/               # Runtime prompt templates
 │   └── forward_pvp/           # Forward-PvP configs
 ├── data/targets/              # Target policy pools
+├── harbor/                    # Harbor task artifacts and run guide
 ├── scripts/                   # Runtime and evaluation entry points
 │   └── codeclash_strategies/  # Optional target-pool generation tooling
 ├── tests/

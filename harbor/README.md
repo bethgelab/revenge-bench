@@ -1,5 +1,10 @@
 # Running RevengeBench Tasks With Harbor
 
+> **Note:** Harbor support is an additional task-artifact interface for running
+> RevengeBench with Harbor-compatible agents and scaffolds. To exactly
+> reproduce the results reported for the benchmark, use the main RevengeBench
+> pipeline described in the repository root README.
+
 This directory contains self-contained
 [Harbor](https://github.com/harbor-framework/harbor) tasks for RevengeBench.
 Each task packages one sealed inverse-strategy problem: the agent can inspect
