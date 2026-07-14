@@ -47,31 +47,24 @@ states and by downstream player-versus-player tournaments.
 This public release keeps upstream CodeClash as a git submodule and places the
 RevengeBench-specific package in `src/revenge_bench`.
 
-## Layout
+## News
 
-```text
-revenge-bench/
-├── vendor/codeclash/          # Upstream CodeClash submodule
-├── src/revenge_bench/         # RevengeBench package
-│   ├── arenas/                # Release arena wrappers/extensions
-│   ├── tournaments/           # Inverse-strategy, Forward-PvP, and BPI tournaments
-│   ├── agents/                # LLM agent wrappers
-│   ├── traces/                # Per-arena trace parsers
-│   └── scripts/               # Importable pipeline utilities
-├── configs/
-│   ├── benchmark/             # Main model x arena configs
-│   ├── conditions/            # Public optional conditions: no-probe, NL observation
-│   ├── baselines/             # Public baselines, including BPI
-│   ├── prompts/               # Runtime prompt templates
-│   └── forward_pvp/           # Forward-PvP configs
-├── data/targets/              # Target policy pools
-├── scripts/                   # Runtime and evaluation entry points
-│   └── codeclash_strategies/  # Optional target-pool generation tooling
-├── tests/
-└── main.py                    # Compatibility entry point
-```
+**2026-07**: RevengeBench was accepted to the Second Workshop on Agents in the
+Wild: Safety, Security, and Beyond (AIWILD) at ICML 2026. See the
+[OpenReview page](https://openreview.net/forum?id=KTnZYPgaQz).
 
 ## Installation
+
+For the released Python package and CLI:
+
+```bash
+pip install revenge-bench
+revenge-bench --help
+```
+
+The PyPI package includes the RevengeBench Python package, CLI entry points,
+benchmark configs, target pools, and lightweight scripts. For full benchmark
+reproduction and development from the source tree:
 
 ```bash
 git clone --recurse-submodules <repo-url> revenge-bench
@@ -103,6 +96,9 @@ This iterates over `configs/benchmark/<model>/<model>_<game>.yaml`.
 Useful runner flags include `--dry-run`, `--resume`, `--parallel N`,
 `--configs "name_a name_b"`, and `--config-dir <dir>`.
 
+<details>
+<summary>Optional run modes</summary>
+
 Public optional conditions and baselines use the same runner:
 
 ```bash
@@ -118,7 +114,12 @@ bash scripts/run_forward_pvp.sh \
     --challengers "gpt5 gpt5-mini gpt-oss-120b grok-4.1-fast kimi-k2.6 deepseek-v3.2"
 ```
 
+</details>
+
 ## Optional Tracks
+
+<details>
+<summary>Track descriptions</summary>
 
 The main benchmark condition is active inverse-strategy recovery with probes.
 The public release also includes:
@@ -131,7 +132,12 @@ The public release also includes:
 Paper-only plotting, history-compaction sweeps, reset-memory sweeps, and probe
 prompt ablation suites are intentionally not part of this release package.
 
+</details>
+
 ## Adding Target Policies
+
+<details>
+<summary>Target policy layout and helper scripts</summary>
 
 Create a directory under `data/targets/<arena>/<policy_name>/` with a
 `main.py` implementing the arena's player API. See the existing target pools
@@ -145,13 +151,49 @@ extract runnable strategies, validate them, and run Elo selection:
 bash scripts/codeclash_strategies/build_pool.sh --game BattleSnake --count 40
 ```
 
+</details>
+
 ## Relationship To CodeClash
+
+<details>
+<summary>CodeClash dependency details</summary>
 
 RevengeBench started from CodeClash and still relies on CodeClash's arena and
 execution abstractions. The upstream CodeClash source is preserved as a
 submodule in `vendor/codeclash`; RevengeBench-specific code lives in
 `src/revenge_bench` so the benchmark can evolve without modifying the vendored
 upstream tree.
+
+</details>
+
+## Layout
+
+<details>
+<summary>Repository tree</summary>
+
+```text
+revenge-bench/
+├── vendor/codeclash/          # Upstream CodeClash submodule
+├── src/revenge_bench/         # RevengeBench package
+│   ├── arenas/                # Release arena wrappers/extensions
+│   ├── tournaments/           # Inverse-strategy, Forward-PvP, and BPI tournaments
+│   ├── agents/                # LLM agent wrappers
+│   ├── traces/                # Per-arena trace parsers
+│   └── scripts/               # Importable pipeline utilities
+├── configs/
+│   ├── benchmark/             # Main model x arena configs
+│   ├── conditions/            # Public optional conditions: no-probe, NL observation
+│   ├── baselines/             # Public baselines, including BPI
+│   ├── prompts/               # Runtime prompt templates
+│   └── forward_pvp/           # Forward-PvP configs
+├── data/targets/              # Target policy pools
+├── scripts/                   # Runtime and evaluation entry points
+│   └── codeclash_strategies/  # Optional target-pool generation tooling
+├── tests/
+└── main.py                    # Compatibility entry point
+```
+
+</details>
 
 ## Citation
 
