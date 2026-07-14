@@ -49,10 +49,8 @@ RevengeBench-specific package in `src/revenge_bench`.
 
 ## News
 
-**2026-07**: Added Harbor task artifacts for running RevengeBench tasks with
-Harbor-compatible agents and scaffolds. See the
-[Harbor run guide](harbor/README.md). Exact reproduction of the benchmark
-results should still use the main pipeline below.
+**2026-07**: Added Harbor task artifacts. See the
+[Harbor run guide](harbor/README.md).
 
 **2026-07**: RevengeBench was accepted to the Second Workshop on Agents in the
 Wild: Safety, Security, and Beyond (AIWILD) at ICML 2026. See the
