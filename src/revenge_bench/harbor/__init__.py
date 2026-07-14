@@ -16,13 +16,6 @@ evaluators
     Declarative, self-validating :class:`EvaluationPlan` codifying the
     privilege boundary (learner code never runs as root; only root reads the
     sealed target). Stdlib only.
-agent
-    ``HarborRevengeAgent`` — an optional Harbor-compatible agent bridge for
-    mini-swe-agent parity runs. The deployable tasks themselves are normal
-    Harbor artifacts and keep probe budget enforcement inside ``sudo
-    run_probe``. Imported lazily (it pulls in the ``harbor`` and
-    ``minisweagent`` frameworks) so ``import revenge_bench.harbor`` stays
-    dependency-light.
 
 The offline (trace-replay) scoring used by Harbor lives under
 :mod:`revenge_bench.harbor.traces`. It intentionally duplicates the native
@@ -32,13 +25,4 @@ remain unchanged.
 
 from __future__ import annotations
 
-__all__ = ["evaluators", "HarborRevengeAgent"]
-
-
-def __getattr__(name: str):
-    """Lazily expose the Harbor agent bridge without importing frameworks eagerly."""
-    if name == "HarborRevengeAgent":
-        from revenge_bench.harbor.agent import HarborRevengeAgent
-
-        return HarborRevengeAgent
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+__all__ = ["evaluators"]

@@ -148,9 +148,9 @@ Required:
   sizes. Probe simulation counts may remain the same explicit knob as the normal
   path, but should be passed through deliberately rather than through a broad
   preserved environment.
-- Custom bridge agents may report or observe probe usage for telemetry, but
-  they must not seed, reset, or redefine the task probe budget. Older bridge
-  kwargs such as `max_probes` should be compatibility no-ops if retained.
+- Harbor tasks must not require a custom RevengeBench agent bridge. Probe budget
+  ownership belongs to the image and `sudo run_probe`; direct Harbor agents must
+  be the supported artifact path.
 - Shared parser/helper for converting replay files into probe `(state, action)`
   pairs, or a byte-identical parity test if tiny glue remains duplicated.
 - Same `probe_action`, `target_action`, `distance`, and `target_state` meanings.
@@ -226,9 +226,8 @@ Treat these as signs the Harbor task may be drifting:
 - Harbor runs the engine with different args or player order.
 - Harbor uses a `stub_*`, always-still, always-up, dummy, or simplified starter
   when the normal path starts from richer arena-provided code.
-- Harbor relies on a custom agent bridge to seed/reset `.probe_budget`; this
-  prevents normal Harbor agents from being the primary artifact path and can
-  cause different runs to have different probe semantics.
+- Harbor relies on a custom agent bridge for probe setup or execution instead
+  of supporting direct Harbor agents through the task image and `sudo run_probe`.
 - Harbor round-0 distance is surprisingly better than the normal path before
   proving starter parity.
 - Harbor round-0 `traces.json` has missing `mean_distance`, zero simulations,
