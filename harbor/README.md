@@ -39,6 +39,31 @@ For quick checks or a single game:
 uv run python -m revenge_bench.harbor.materialize --game robotrumble --target-count 2 --force
 ```
 
+## Source-build fallback
+
+The intended public path is to pull prebuilt task images once they are published
+to Docker Hub. If you instead want Harbor or Docker to build a task image from
+this repository, first stage the local build context for that task:
+
+```bash
+./tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0/build_context.sh
+harbor run -p tasks/battlesnake-gpt5-t09-gpt5-9aa36d603153-v0 -a nop --force-build
+```
+
+For the whole generated task set, stage during materialization:
+
+```bash
+uv run python -m revenge_bench.harbor.materialize --force --stage
+```
+
+This matters because generated Docker contexts do not fetch `revenge_bench` from
+PyPI. They install the wheel staged under each task's `environment/wheels/`, plus
+the staged target/opponent assets under `environment/staging/`. Building from an
+unstaged or stale context can produce images whose verifier imports fail, even
+though the task directory itself looks complete. Rerun the task's
+`build_context.sh` after changing Harbor scoring, trace parsing, prompts, task
+metadata, or target/opponent staging.
+
 ## Security model
 
 Each task uses the single-container, Unix-user sealing design proven in
