@@ -1,0 +1,27 @@
+# Harbor job config for the RevengeBench BattleSnake inverse-strategy task.
+#
+# Run from this directory (harbor/):
+#
+#     cd harbor
+#     export OPENAI_API_KEY=...
+#     harbor run -c run.yaml
+#
+# The task image keeps general internet disabled. `extra_allowed_hosts` below is
+# the narrow egress exception the Codex agent needs to reach the model API.
+
+job_name: revengebench-battlesnake-inverse-v0
+n_attempts: 1
+n_concurrent_trials: 1
+
+tasks:
+  - path: tasks/battlesnake-gpt5-9aa3-v0
+
+agents:
+  - name: codex
+    model_name: gpt-5.4-mini
+    extra_allowed_hosts:
+      - api.openai.com
+
+environment:
+  type: docker
+  force_build: false

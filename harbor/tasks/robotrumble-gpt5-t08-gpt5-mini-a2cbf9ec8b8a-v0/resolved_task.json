@@ -1,0 +1,33 @@
+{
+  "benchmark_config": "configs/benchmark/gpt5/gpt5_robotrumble.yaml",
+  "target_index": 8,
+  "target_name": "gpt5-mini__a2cbf9ec8b8a",
+  "target_path": "data/targets/robotrumble/gpt5-mini__a2cbf9ec8b8a",
+  "opponents": [
+    "data/targets/robotrumble/o3__27b48f25768c",
+    "data/targets/robotrumble/gemini-2.5-pro__c8dac6d701e6",
+    "data/targets/robotrumble/gpt5__8c2fd57869a9",
+    "data/targets/robotrumble/gemini-2.5-pro__9f1a019b5a95",
+    "data/targets/robotrumble/o3__09bcc4777f89",
+    "data/targets/robotrumble/gpt5-mini__4e70dba35853",
+    "data/targets/robotrumble/cs4-20250514__f4e7fc5c7d93",
+    "data/targets/robotrumble/gpt5-mini__366e38fc72c8",
+    "data/targets/robotrumble/cs4-5-20250929__684b5ef99e4f",
+    "data/targets/robotrumble/o3__f35d31c428b9",
+    "data/targets/robotrumble/qwen3-coder-plus-2025-09-23__926cd0a1a61d",
+    "data/targets/robotrumble/cs4-20250514__d06de577a885",
+    "data/targets/robotrumble/cs4-20250514__e60da042b2dd",
+    "data/targets/robotrumble/cs4-5-20250929__ef774852ce8f",
+    "data/targets/robotrumble/cs4-20250514__d8cf753ede01",
+    "data/targets/robotrumble/grok-code-fast-1__20e444fd6779",
+    "data/targets/robotrumble/cs4-5-20250929__c6980d81e574",
+    "data/targets/robotrumble/qwen3-coder-plus-2025-09-23__4681c388dfa7",
+    "data/targets/robotrumble/cs4-5-20250929__344e716f9f84",
+    "data/targets/robotrumble/grok-code-fast-1__6403c952e9eb"
+  ],
+  "opponents_per_round": 20,
+  "sims_per_round": 20,
+  "seed": 42,
+  "top_elo_targets": 15,
+  "raw": true
+}

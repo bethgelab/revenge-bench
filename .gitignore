@@ -24,13 +24,13 @@ figures/**
 !figures/.gitkeep
 logs_keep/**
 uv.lock.backup
-harbor/
 
 
 # -------------
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+**/__pycache__/
 *.py[codz]
 *$py.class
 
@@ -51,7 +51,11 @@ parts/
 sdist/
 var/
 wheels/
+!harbor/tasks/*/environment/wheels/
+!harbor/tasks/*/environment/wheels/*.whl
 share/python-wheels/
+harbor/jobs/
+jobs/
 *.egg-info/
 .installed.cfg
 *.egg

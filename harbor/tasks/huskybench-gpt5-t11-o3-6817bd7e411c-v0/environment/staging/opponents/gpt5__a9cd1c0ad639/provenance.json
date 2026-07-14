@@ -1,0 +1,34 @@
+{
+  "source": "codeclash_viewer",
+  "game": "HuskyBench",
+  "model": "gpt5",
+  "tournament": "PvpTournament.HuskyBench.r15.s100.p2.gpt-5.gpt-5-mini.251018171434.b82d1e86-6778-4de3-bf79-d44198922759-uuid",
+  "source_path": "data/extracted_strategies/HuskyBench/PvpTournament.HuskyBench.r15.s100.p2.gpt-5.gpt-5-mini.251018171434.b82d1e86-6778-4de3-bf79-d44198922759-uuid/final/gpt5",
+  "lines": 349,
+  "content_hash": "a9cd1c0ad639",
+  "complexity_score": 83.5,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 83.5,
+    "loc": 349,
+    "func_count": 19,
+    "max_nesting_depth": 13,
+    "branch_count": 60,
+    "node_count": 2873,
+    "algorithm_score": 11,
+    "algorithms_found": [
+      "pot_odds",
+      "equity",
+      "three_bet",
+      "tight",
+      "range"
+    ],
+    "data_structure_score": 1
+  },
+  "elo": 1556.8,
+  "elo_rank": 7,
+  "elo_total": 40,
+  "elo_win_rate": 0.6,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

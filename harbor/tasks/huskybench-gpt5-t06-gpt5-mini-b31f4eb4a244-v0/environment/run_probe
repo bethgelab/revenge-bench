@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SIMS="${SIMS_PER_PROBE:-50}"
+exec env -i \
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  HOME=/root \
+  PYTHONNOUSERSITE=1 \
+  python3 -I /opt/huskybench/run_probe_impl.py "$SIMS"
