@@ -1,0 +1,4 @@
+{
+  "benchmark_config": "configs/benchmark/gpt5/gpt5_robotrumble.yaml",
+  "target_index": 3
+}

@@ -85,6 +85,8 @@ revenge_bench = [
     "arenas/**/*.def",
     "arenas/**/*.js",
     "arenas/**/main_seed.py",
+    "harbor/prompts/**/*.yaml",
+    "harbor/traces/parsers/*.js",
     "traces/parsers/*.js",
     "assets/configs/**/*",
     "assets/data/**/*",

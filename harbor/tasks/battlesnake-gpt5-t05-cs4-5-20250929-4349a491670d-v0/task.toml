@@ -1,0 +1,50 @@
+schema_version = "1.1"
+artifacts = []
+
+[task]
+name = "revengebench/battlesnake-gpt5-t05-cs4-5-20250929-4349a491670d-v0"
+description = "Infer and reproduce a sealed BattleSnake target bot's policy. Probe the hidden target with your own bot (bounded probe budget), then implement /workspace/main.py so its moves match the target's on held-out states. Scored by mean action distance (lower is better)."
+keywords = ["inverse-strategy", "imitation", "battlesnake", "agentic", "revengebench", "interactive"]
+[[task.authors]]
+name = "RevengeBench Team"
+email = "revengebench@example.com"
+
+[metadata]
+author_name = "RevengeBench Team"
+author_email = "revengebench@example.com"
+difficulty = "medium"
+category = "agentic-games"
+tags = ["inverse-strategy", "imitation-learning", "battlesnake", "interactive-probe", "revengebench"]
+expert_time_estimate_min = 60.0
+junior_time_estimate_min = 240.0
+game = "BattleSnake"
+arena = "battlesnake"
+task_mode = "inverse_strategy"
+
+[verifier]
+timeout_sec = 600.0
+user = "root"
+
+[agent]
+timeout_sec = 7200.0
+user = "agent"
+
+[environment]
+build_timeout_sec = 1800.0
+docker_image = "revengebench/battlesnake-gpt5-t05-cs4-5-20250929-4349a491670d-v0:latest"
+cpus = 2
+memory_mb = 4096
+storage_mb = 8192
+gpus = 0
+allow_internet = false
+mcp_servers = []
+
+[environment.env]
+SIMS_PER_PROBE = "3"
+BOARD_W = "11"
+BOARD_H = "11"
+
+[verifier.env]
+REVENGE_ROUND = "1"
+
+[solution.env]

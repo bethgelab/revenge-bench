@@ -1,0 +1,304 @@
+import pathfinding
+# Welcome to
+# __________         __    __  .__                               __
+# \______   \_____ _/  |__/  |_|  |   ____   ______ ____ _____  |  | __ ____
+#  |    |  _/\__  \\   __\   __\  | _/ __ \ /  ___//    \\__  \ |  |/ // __ \
+#  |    |   \ / __ \|  |  |  | |  |_\  ___/ \___ \|   |  \/ __ \|    <\  ___/
+#  |________/(______/__|  |__| |____/\_____>______>___|__(______/__|__\\_____>
+#
+# This file can be a nice home for your Battlesnake logic and helper functions.
+#
+# To get you started we've included code to prevent your Battlesnake from moving backwards.
+# For more info see docs.battlesnake.com
+
+import random
+import typing
+from collections import deque
+
+
+# info is called when you create your Battlesnake on play.battlesnake.com
+# and controls your Battlesnake's appearance
+# TIP: If you open your Battlesnake URL in a browser you should see this data
+def info() -> typing.Dict:
+    print("INFO")
+
+    return {
+        "apiversion": "1",
+        "author": "claude-sonnet-4-20250514",  # Updated with team name
+        "color": "#4A90E2",  # Changed to a nice blue color
+        "head": "default",
+        "tail": "default",
+    }
+
+
+# start is called when your Battlesnake begins a game
+def start(game_state: typing.Dict):
+    print("GAME START")
+
+
+# end is called when your Battlesnake finishes a game
+def end(game_state: typing.Dict):
+    print("GAME OVER\n")
+
+
+def get_next_position(head: typing.Dict, direction: str) -> typing.Dict:
+    """Get the next position given current head and direction"""
+    x, y = head["x"], head["y"]
+    if direction == "up":
+        return {"x": x, "y": y + 1}
+    elif direction == "down":
+        return {"x": x, "y": y - 1}
+    elif direction == "left":
+        return {"x": x - 1, "y": y}
+    elif direction == "right":
+        return {"x": x + 1, "y": y}
+    return head
+
+
+def is_out_of_bounds(pos: typing.Dict, board_width: int, board_height: int) -> bool:
+    """Check if position is out of bounds"""
+    return pos["x"] < 0 or pos["x"] >= board_width or pos["y"] < 0 or pos["y"] >= board_height
+
+
+def is_collision_with_snake(pos: typing.Dict, snake_body: typing.List[typing.Dict]) -> bool:
+    """Check if position collides with snake body"""
+    return pos in snake_body
+
+
+def manhattan_distance(pos1: typing.Dict, pos2: typing.Dict) -> int:
+    """Calculate Manhattan distance between two positions"""
+    return abs(pos1["x"] - pos2["x"]) + abs(pos1["y"] - pos2["y"])
+
+
+def find_closest_food(head: typing.Dict, food: typing.List[typing.Dict]) -> typing.Dict:
+    """Find the closest food to the head"""
+    if not food:
+        return None
+    return min(food, key=lambda f: manhattan_distance(head, f))
+
+
+def predict_opponent_moves(opponent: typing.Dict, food: typing.List[typing.Dict], board_width: int, board_height: int) -> typing.List[typing.Dict]:
+    """Simple opponent move prediction - just valid moves"""
+    opponent_head = opponent["body"][0]
+    opponent_neck = opponent["body"][1] if len(opponent["body"]) > 1 else opponent_head
+    
+    possible_moves = []
+    
+    for direction in ["up", "down", "left", "right"]:
+        next_pos = get_next_position(opponent_head, direction)
+        
+        # Skip if out of bounds
+        if is_out_of_bounds(next_pos, board_width, board_height):
+            continue
+            
+        # Skip if would hit own body
+        if is_collision_with_snake(next_pos, opponent["body"][:-1]):
+            continue
+            
+        # Skip backward movement
+        if next_pos == opponent_neck:
+            continue
+        
+        possible_moves.append(next_pos)
+    
+    return possible_moves
+
+
+def is_head_to_head_collision_risk(my_next_pos: typing.Dict, opponents: typing.List[typing.Dict], 
+                                   my_length: int, board_width: int, board_height: int, 
+                                   food: typing.List[typing.Dict]) -> bool:
+    """Check if moving to my_next_pos risks a head-to-head collision"""
+    for opponent in opponents:
+        opponent_possible_moves = predict_opponent_moves(opponent, food, board_width, board_height)
+        
+        for opp_pos in opponent_possible_moves:
+            if opp_pos == my_next_pos:
+                # Head-to-head collision detected!
+                opponent_length = len(opponent["body"])
+                
+                # Only avoid if we are shorter or equal length
+                if my_length <= opponent_length:
+                    return True
+                        
+    return False
+
+
+def calculate_space_control(start_pos: typing.Dict, game_state: typing.Dict, max_depth: int = 10) -> int:
+    """Calculate how much space is reachable from a given position using flood fill"""
+    board_width = game_state['board']['width']
+    board_height = game_state['board']['height']
+    
+    # Get all occupied positions (snake bodies)
+    occupied = set()
+    for snake in game_state['board']['snakes']:
+        for segment in snake['body'][:-1]:  # Exclude tail as it will move
+            occupied.add((segment['x'], segment['y']))
+    
+    # Flood fill to count reachable spaces
+    visited = set()
+    queue = deque([(start_pos['x'], start_pos['y'], 0)])
+    visited.add((start_pos['x'], start_pos['y']))
+    reachable_count = 0
+    
+    while queue and reachable_count < max_depth:
+        x, y, depth = queue.popleft()
+        reachable_count += 1
+        
+        if depth >= max_depth:
+            continue
+            
+        # Check all adjacent positions
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            nx, ny = x + dx, y + dy
+            
+            if (nx, ny) not in visited:
+                if (0 <= nx < board_width and 0 <= ny < board_height and 
+                    (nx, ny) not in occupied):
+                    visited.add((nx, ny))
+                    queue.append((nx, ny, depth + 1))
+    
+    return reachable_count
+
+
+# move is called on every turn and returns your next move
+# Valid moves are "up", "down", "left", or "right"
+# See https://docs.battlesnake.com/api/example-move for available data
+def move(game_state: typing.Dict) -> typing.Dict:
+
+    is_move_safe = {"up": True, "down": True, "left": True, "right": True}
+
+    # We've included code to prevent your Battlesnake from moving backwards
+    my_head = game_state["you"]["body"][0]  # Coordinates of your head
+    my_neck = game_state["you"]["body"][1] if len(game_state["you"]["body"]) > 1 else my_head  # Coordinates of your "neck"
+    my_length = len(game_state["you"]["body"])
+    my_health = game_state["you"]["health"]
+
+    if my_neck["x"] < my_head["x"]:  # Neck is left of head, don't move left
+        is_move_safe["left"] = False
+
+    elif my_neck["x"] > my_head["x"]:  # Neck is right of head, don't move right
+        is_move_safe["right"] = False
+
+    elif my_neck["y"] < my_head["y"]:  # Neck is below head, don't move down
+        is_move_safe["down"] = False
+
+    elif my_neck["y"] > my_head["y"]:  # Neck is above head, don't move up
+        is_move_safe["up"] = False
+
+    # Step 1 - Prevent your Battlesnake from moving out of bounds
+    board_width = game_state['board']['width']
+    board_height = game_state['board']['height']
+    
+    for direction in is_move_safe:
+        next_pos = get_next_position(my_head, direction)
+        if is_out_of_bounds(next_pos, board_width, board_height):
+            is_move_safe[direction] = False
+
+    # Step 2 - Prevent your Battlesnake from colliding with itself
+    my_body = game_state['you']['body']
+    
+    for direction in is_move_safe:
+        next_pos = get_next_position(my_head, direction)
+        # Don't check the tail unless we're about to eat food (snake will grow)
+        body_to_check = my_body[:-1]  # Exclude tail since it will move
+        if is_collision_with_snake(next_pos, body_to_check):
+            is_move_safe[direction] = False
+
+    # Step 3 - Prevent your Battlesnake from colliding with other Battlesnakes
+    opponents = game_state['board']['snakes']
+    
+    for direction in is_move_safe:
+        next_pos = get_next_position(my_head, direction)
+        for opponent in opponents:
+            if opponent['id'] != game_state['you']['id']:  # Don't check against ourselves
+                if is_collision_with_snake(next_pos, opponent['body']):
+                    is_move_safe[direction] = False
+
+    # Step 4 - Avoid head-to-head collisions unless we have length advantage
+    food = game_state['board']['food']
+    opponent_snakes = [s for s in opponents if s['id'] != game_state['you']['id']]
+    
+    for direction in list(is_move_safe.keys()):
+        if is_move_safe[direction]:
+            next_pos = get_next_position(my_head, direction)
+            if is_head_to_head_collision_risk(next_pos, opponent_snakes, my_length, board_width, board_height, food):
+                is_move_safe[direction] = False
+                print(f"MOVE {game_state['turn']}: Avoiding head-to-head collision risk at {next_pos}")
+
+    # Are there any safe moves left?
+    safe_moves = []
+    for move_dir, isSafe in is_move_safe.items():
+        if isSafe:
+            safe_moves.append(move_dir)
+
+    if len(safe_moves) == 0:
+        print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
+        return {"move": "down"}
+
+    # Step 5 - Choose move based on food seeking and space control
+    if food:
+        closest_food = pathfinding.find_best_food_with_pathfinding(my_head, food, game_state)
+        if closest_food:
+            # Evaluate each safe move
+            move_scores = []
+            
+            for direction in safe_moves:
+                next_pos = get_next_position(my_head, direction)
+                
+                # Food distance score (lower is better, so negate)
+                food_distance = pathfinding.a_star_distance(next_pos, closest_food, game_state)
+                if food_distance == float("inf"):
+                    food_distance = 999  # Large penalty for unreachable food
+                food_score = -food_distance
+                
+                # Space control score
+                space_score = calculate_space_control(next_pos, game_state)
+                
+                # Combined score (prioritize food when health is low, space when health is high)
+                if my_health < 15:
+                    # Very aggressive food seeking when critically low
+                    total_score = food_score * 4 + space_score * 0.1
+                elif my_health < 30:
+                    # Prioritize food when health is low
+                    total_score = food_score * 2 + space_score * 0.5
+                else:
+                    # Balance food and space when health is good
+                    total_score = food_score + space_score
+                
+                move_scores.append((direction, total_score, food_distance, space_score))
+            
+            # Sort by score (highest first)
+            move_scores.sort(key=lambda x: x[1], reverse=True)
+            
+            best_move = move_scores[0][0]
+            best_score = move_scores[0][1]
+            
+            print(f"MOVE {game_state['turn']}: Moving {best_move} (score: {best_score:.1f}) towards food at {closest_food}")
+            print(f"  Move analysis: {[(m[0], f'{m[1]:.1f}') for m in move_scores]}")
+            
+            return {"move": best_move}
+
+    # If no food, choose move with best space control
+    if len(safe_moves) > 1:
+        space_scores = []
+        for direction in safe_moves:
+            next_pos = get_next_position(my_head, direction)
+            space_score = calculate_space_control(next_pos, game_state)
+            space_scores.append((direction, space_score))
+        
+        space_scores.sort(key=lambda x: x[1], reverse=True)
+        best_move = space_scores[0][0]
+        print(f"MOVE {game_state['turn']}: No food - choosing {best_move} for space control")
+        return {"move": best_move}
+
+    # Fallback to random safe move
+    next_move = random.choice(safe_moves)
+    print(f"MOVE {game_state['turn']}: Random safe move {next_move}")
+    return {"move": next_move}
+
+
+# Start server when `python main.py` is run
+if __name__ == "__main__":
+    from server import run_server
+
+    run_server({"info": info, "start": start, "move": move, "end": end})

@@ -1,0 +1,32 @@
+{
+  "benchmark_config": "configs/benchmark/gpt5/gpt5_huskybench.yaml",
+  "target_index": 12,
+  "target_name": "o3__9015614a1a48",
+  "target_path": "data/targets/huskybench/o3__9015614a1a48",
+  "opponents": [
+    "data/targets/huskybench/gemini-2.5-pro__0d5fb910ddeb",
+    "data/targets/huskybench/grok-code-fast-1__ab9a91288094",
+    "data/targets/huskybench/qwen3-coder-plus-2025-09-23__17b9476a725b",
+    "data/targets/huskybench/gpt5-mini__b86a5fd7661f",
+    "data/targets/huskybench/o3__01c0872e2c4b",
+    "data/targets/huskybench/o3__1146a321d226",
+    "data/targets/huskybench/grok-code-fast-1__104f6bb227b3",
+    "data/targets/huskybench/gemini-2.5-pro__e413f80bbce3",
+    "data/targets/huskybench/o3__7277047ef5e2",
+    "data/targets/huskybench/gemini-2.5-pro__458429b9baf8",
+    "data/targets/huskybench/gpt5-mini__b31f4eb4a244",
+    "data/targets/huskybench/gpt5__b950e7a98639",
+    "data/targets/huskybench/gemini-2.5-pro__abcfd78923af",
+    "data/targets/huskybench/cs4-5-20250929__ef9f9aebeb7b",
+    "data/targets/huskybench/grok-code-fast-1__92ba781d6f81",
+    "data/targets/huskybench/grok-code-fast-1__60b1491b252b",
+    "data/targets/huskybench/cs4-20250514__bc3e15220bdf",
+    "data/targets/huskybench/gpt5-mini__563b7a8fa4d0",
+    "data/targets/huskybench/gpt5-mini__5eb04979f470",
+    "data/targets/huskybench/o3__e93f8981a0bc"
+  ],
+  "opponents_per_round": 20,
+  "sims_per_round": 400,
+  "seed": 42,
+  "top_elo_targets": 15
+}

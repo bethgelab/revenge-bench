@@ -1,0 +1,31 @@
+{
+  "source": "codeclash_viewer",
+  "game": "BattleSnake",
+  "model": "gemini-2.5-pro",
+  "tournament": "PvpTournament.BattleSnake.r15.s1000.p2.claude-sonnet-4-20250514.gemini-2.5-pro.251002021251",
+  "source_path": "data/extracted_strategies/BattleSnake/PvpTournament.BattleSnake.r15.s1000.p2.claude-sonnet-4-20250514.gemini-2.5-pro.251002021251/final/gemini-2.5-pro",
+  "lines": 435,
+  "content_hash": "9491bf13aa25",
+  "complexity_score": 69.0,
+  "complexity_tier": "high",
+  "complexity_breakdown": {
+    "total": 69.0,
+    "loc": 435,
+    "func_count": 10,
+    "max_nesting_depth": 5,
+    "branch_count": 68,
+    "node_count": 2575,
+    "algorithm_score": 6,
+    "algorithms_found": [
+      "flood_fill",
+      "minimax"
+    ],
+    "data_structure_score": 1
+  },
+  "elo": 1474.2,
+  "elo_rank": 33,
+  "elo_total": 40,
+  "elo_win_rate": 0.333,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}

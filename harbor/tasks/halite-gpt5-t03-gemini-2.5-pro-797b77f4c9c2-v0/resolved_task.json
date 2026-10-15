@@ -1,0 +1,32 @@
+{
+  "benchmark_config": "configs/benchmark/gpt5/gpt5_halite.yaml",
+  "target_index": 3,
+  "target_name": "gemini-2.5-pro__797b77f4c9c2",
+  "target_path": "data/targets/halite/gemini-2.5-pro__797b77f4c9c2",
+  "opponents": [
+    "data/targets/halite/gpt5-mini__9a9257161ef8",
+    "data/targets/halite/grok-code-fast-1__cf5904738030",
+    "data/targets/halite/o3__f7034e6c2071",
+    "data/targets/halite/gpt5-mini__19cc927998e8",
+    "data/targets/halite/cs4-20250514__df6804d9a90e",
+    "data/targets/halite/gpt5-mini__f6a4394056e6",
+    "data/targets/halite/gpt5__c5aecab34124",
+    "data/targets/halite/cs4-20250514__859ca8a35fe2",
+    "data/targets/halite/cs4-20250514__b4b3a8ea19a4",
+    "data/targets/halite/gpt5-mini__0398f94a8bef",
+    "data/targets/halite/cs4-20250514__3d386035ddd8",
+    "data/targets/halite/cs4-20250514__c183bc6eb245",
+    "data/targets/halite/cs4-5-20250929__efaca3c57599",
+    "data/targets/halite/grok-code-fast-1__8ba19be9c293",
+    "data/targets/halite/grok-code-fast-1__f1d9d9b12d79",
+    "data/targets/halite/qwen3-coder-plus-2025-09-23__ecd0ae6e5654",
+    "data/targets/halite/gpt5__6e0a8bf090a2",
+    "data/targets/halite/qwen3-coder-plus-2025-09-23__d57d031b04a1",
+    "data/targets/halite/qwen3-coder-plus-2025-09-23__40585eb155cc",
+    "data/targets/halite/o3__7b3c5fdd7395"
+  ],
+  "opponents_per_round": 20,
+  "sims_per_round": 20,
+  "seed": 42,
+  "top_elo_targets": 15
+}

@@ -1,0 +1,32 @@
+{
+  "benchmark_config": "configs/benchmark/gpt5/gpt5_robocode.yaml",
+  "target_index": 11,
+  "target_name": "o3__7ad8ab7b079e",
+  "target_path": "data/targets/robocode/o3__7ad8ab7b079e",
+  "opponents": [
+    "data/targets/robocode/gemini25pro__2c03e73826f3",
+    "data/targets/robocode/grokcodefast1__c37d49204e12",
+    "data/targets/robocode/o3__5c4cf9a399d7",
+    "data/targets/robocode/grokcodefast1__cbbb94d86842",
+    "data/targets/robocode/o3__ed501449b3ce",
+    "data/targets/robocode/grokcodefast1__2a2abccdfd8e",
+    "data/targets/robocode/qwen3coderplus20250923__9ebdba6c8641",
+    "data/targets/robocode/claudesonnet420250514__2fc174f54af4",
+    "data/targets/robocode/grokcodefast1__80d01e2ea502",
+    "data/targets/robocode/qwen3coderplus20250923__862a36f1493c",
+    "data/targets/robocode/grokcodefast1__e08a71d91855",
+    "data/targets/robocode/claudesonnet420250514__e1f04425a88c",
+    "data/targets/robocode/claudesonnet4520250929__d3ebd794334d",
+    "data/targets/robocode/o3__ffc6d7693b80",
+    "data/targets/robocode/claudesonnet420250514__a179d671c515",
+    "data/targets/robocode/claudesonnet4520250929__52a747f942a5",
+    "data/targets/robocode/grokcodefast1__add30a391d4e",
+    "data/targets/robocode/qwen3coderplus20250923__18a686c44095",
+    "data/targets/robocode/gpt5mini__fd915882a87e",
+    "data/targets/robocode/grokcodefast1__5b2f214830f8"
+  ],
+  "opponents_per_round": 20,
+  "sims_per_round": 20,
+  "seed": 42,
+  "top_elo_targets": 15
+}

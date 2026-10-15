@@ -1,0 +1,4 @@
+{
+  "benchmark_config": "configs/benchmark/gpt5/gpt5_battlesnake.yaml",
+  "target_index": 10
+}

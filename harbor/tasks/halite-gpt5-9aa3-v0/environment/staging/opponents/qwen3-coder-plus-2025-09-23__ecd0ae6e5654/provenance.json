@@ -1,0 +1,17 @@
+{
+  "source_path": "data/extracted_strategies/Halite/PvpTournament.Halite.r15.s250.p2.claude-sonnet-4-5-20250929.qwen3-coder-plus-2025-09-23.251021040703.71785018-b084-4c60-9797-6c65b5fe1428-uuid/final/qwen3-coder-plus-2025-09-23",
+  "model": "qwen3-coder-plus-2025-09-23",
+  "complexity_score": 55,
+  "content_hash": "ecd0ae6e5654",
+  "replaces": "qwen3-coder-plus-2025-09-23__455878a5b02f",
+  "replacement_reason": "Original failed Halite arena gcc compilation",
+  "elo": 1333.9,
+  "elo_rank": 40,
+  "elo_total": 40,
+  "elo_win_rate": 0.133,
+  "elo_matches": 15,
+  "elo_tier": "easy",
+  "complexity_tier": "medium",
+  "game": "Halite",
+  "source": "fix_pools_replacement"
+}

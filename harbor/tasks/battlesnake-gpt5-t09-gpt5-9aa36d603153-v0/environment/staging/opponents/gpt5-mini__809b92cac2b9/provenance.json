@@ -1,0 +1,28 @@
+{
+  "source": "codeclash_viewer",
+  "game": "BattleSnake",
+  "model": "gpt5-mini",
+  "tournament": "PvpTournament.BattleSnake.r15.s1000.p2.gpt-5-mini.grok-code-fast-1.250926010433",
+  "source_path": "data/extracted_strategies/BattleSnake/PvpTournament.BattleSnake.r15.s1000.p2.gpt-5-mini.grok-code-fast-1.250926010433/final/gpt5-mini",
+  "lines": 128,
+  "content_hash": "809b92cac2b9",
+  "complexity_score": 44.33,
+  "complexity_tier": "low",
+  "complexity_breakdown": {
+    "total": 44.33,
+    "loc": 128,
+    "func_count": 6,
+    "max_nesting_depth": 5,
+    "branch_count": 22,
+    "node_count": 796,
+    "algorithm_score": 0,
+    "algorithms_found": [],
+    "data_structure_score": 1
+  },
+  "elo": 1489.2,
+  "elo_rank": 31,
+  "elo_total": 40,
+  "elo_win_rate": 0.267,
+  "elo_matches": 15,
+  "elo_tier": "easy"
+}

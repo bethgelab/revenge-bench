@@ -1,0 +1,26 @@
+{
+  "source": "codeclash_viewer",
+  "game": "RoboCode",
+  "model": "gemini25pro",
+  "tournament": "PvpTournament.RoboCode.r15.s250.p2.claudesonnet420250514.gemini25pro.251011064436",
+  "source_path": "data/extracted_strategies/RoboCode/PvpTournament.RoboCode.r15.s250.p2.claudesonnet420250514.gemini25pro.251011064436/final/gemini25pro",
+  "lines": 122,
+  "content_hash": "2c03e73826f3",
+  "complexity_score": 66,
+  "complexity_tier": "medium",
+  "complexity_breakdown": {
+    "total": 66,
+    "loc": 122,
+    "branch_count": 8,
+    "method_count": 30,
+    "event_handler_count": 3,
+    "strategy_score": 0,
+    "strategies_found": []
+  },
+  "elo": 1568.5,
+  "elo_rank": 3,
+  "elo_total": 40,
+  "elo_win_rate": 0.667,
+  "elo_matches": 15,
+  "elo_tier": "hard"
+}

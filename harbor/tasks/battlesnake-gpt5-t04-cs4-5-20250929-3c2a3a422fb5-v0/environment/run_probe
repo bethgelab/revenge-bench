@@ -1,0 +1,166 @@
+#!/bin/bash
+# run_probe - trusted BattleSnake interactive-probe oracle (RevengeBench Tier I).
+#
+# The agent (unprivileged user `agent`, UID 1000) edits its hypothesised policy
+# in /workspace and a probe bot in /workspace/probe.py. Running `run_probe` (via
+# the pre-authorised sudoers entry) plays a short probe-vs-target game against
+# the SEALED target at /target/main.py (root:root 0700 — unreadable to the
+# agent) and returns the observed (state, action) pairs so the agent can learn
+# the target's policy, WITHOUT ever exposing target source.
+#
+# Ported from InverseStrategyInterventionist._execute_battlesnake_probe /
+# _parse_battlesnake_probe_traces, adapted to AgenticPIC's single-container
+# Unix-user sealing model.
+#
+# Output: /workspace/probe_trace_{N}.json (owned by agent) + a stdout summary.
+set -euo pipefail
+
+WORKSPACE=/workspace
+PROBE_SRC="$WORKSPACE/probe.py"
+TARGET_DIR="/target"                             # sealed: root:root 0700
+TARGET_SRC="$TARGET_DIR/main.py"
+SERVER="/opt/battlesnake/server.py"
+BATTLESNAKE="/opt/battlesnake/battlesnake"
+PARSER="/opt/battlesnake/parse_probe_traces.py"
+BUDGET_FILE="$WORKSPACE/.probe_budget"
+ARENA="/run/probe_arena"                         # root-owned scratch
+SIMS_PER_PROBE="${SIMS_PER_PROBE:-3}"
+BOARD_W=11
+BOARD_H=11
+PROBE_PID=""
+TARGET_PID=""
+
+json_error() {
+    python3 -c 'import json, sys; print(json.dumps({"error": sys.argv[1]}))' "$1"
+}
+
+cleanup() {
+    [ -n "$PROBE_PID" ] && kill "$PROBE_PID" 2>/dev/null || true
+    [ -n "$TARGET_PID" ] && kill "$TARGET_PID" 2>/dev/null || true
+    pkill -f "$ARENA/probe/main.py" 2>/dev/null || true
+    pkill -f "$ARENA/target/main.py" 2>/dev/null || true
+}
+
+on_error() {
+    trap - ERR
+    cleanup
+    json_error "probe failed"
+    exit 0
+}
+
+trap on_error ERR
+trap cleanup EXIT
+
+# --- next probe number --------------------------------------------------------
+PROBE_NUM=1
+while [ -f "$WORKSPACE/probe_trace_${PROBE_NUM}.json" ]; do
+    PROBE_NUM=$((PROBE_NUM + 1))
+done
+OUT="$WORKSPACE/probe_trace_${PROBE_NUM}.json"
+
+# --- budget enforcement (budget file is root-owned; agent cannot reset it) ----
+REMAINING="null"
+if [ -f "$BUDGET_FILE" ]; then
+    BUDGET=$(cat "$BUDGET_FILE" 2>/dev/null | tr -d '[:space:]')
+    if [[ "$BUDGET" =~ ^[0-9]+$ ]] && [ "$BUDGET" -le 0 ]; then
+        echo '{"error": "Probe budget exhausted (0 probes remaining). Prior results are in /workspace/probe_trace_*.json"}'
+        exit 0
+    fi
+    if [[ "$BUDGET" =~ ^[0-9]+$ ]]; then
+        REMAINING=$((BUDGET - 1))
+        echo "$REMAINING" > "$BUDGET_FILE"
+        chown 0:0 "$BUDGET_FILE" 2>/dev/null || true
+        chmod 0644 "$BUDGET_FILE" 2>/dev/null || true
+    fi
+fi
+
+# --- harden environment (anti import-hijack) ----------------------------------
+unset PYTHONPATH PYTHONSTARTUP PYTHONHOME
+export HOME=/root
+export PATH=/usr/local/bin:/usr/bin:/bin
+export PYTHONNOUSERSITE=1
+
+# --- validate inputs ----------------------------------------------------------
+if [ ! -f "$PROBE_SRC" ]; then
+    echo '{"error": "No probe bot found at /workspace/probe.py"}'
+    exit 0
+fi
+if [ ! -f "$TARGET_SRC" ]; then
+    echo '{"error": "Sealed target not found in container"}'
+    exit 0
+fi
+
+# --- arena setup (root-owned; probe dir handed to agent, target dir sealed) ----
+rm -rf "$ARENA"
+mkdir -p "$ARENA/probe" "$ARENA/target" "$ARENA/logs"
+cp "$SERVER" "$ARENA/probe/server.py"
+cp "$PROBE_SRC" "$ARENA/probe/main.py"
+cp -a "$TARGET_DIR"/. "$ARENA/target/"
+cp "$SERVER" "$ARENA/target/server.py"
+# Agent runs the probe server, so it needs the probe dir + a place for logs.
+chown -R agent:agent "$ARENA/probe" "$ARENA/logs"
+# Target dir holds sealed target source -> stays root-only.
+chown -R 0:0 "$ARENA/target"
+chmod 700 "$ARENA/target"
+
+# --- random loopback ports (not revealed to the agent) ------------------------
+PROBE_PORT=$(( 20000 + RANDOM % 20000 ))
+TARGET_PORT=$(( 40000 + RANDOM % 20000 ))
+
+# --- start servers ------------------------------------------------------------
+# Probe server runs the AGENT's code as the unprivileged `agent` user, so it can
+# never read the sealed /target. Target server runs trusted target code as root.
+# Each bot is a self-contained server script (`python main.py` with server.py
+# alongside), matching the native arena's `PORT=$P python {submission}` launch.
+# We DON'T use `python3 -I` here: isolated mode implies -P (Py3.11+), which
+# drops the script's directory from sys.path and would break `from server import
+# run_server`. `env -i` + explicit PATH + PYTHONNOUSERSITE still harden the env.
+sudo -u agent env -i \
+    HOME=/home/agent \
+    PATH=/usr/local/bin:/usr/bin:/bin \
+    PYTHONNOUSERSITE=1 \
+    PORT="$PROBE_PORT" \
+    python3 "$ARENA/probe/main.py" >"$ARENA/logs/probe_server.log" 2>&1 &
+PROBE_PID=$!
+
+env -i \
+    HOME=/root \
+    PATH=/usr/local/bin:/usr/bin:/bin \
+    PYTHONNOUSERSITE=1 \
+    PORT="$TARGET_PORT" \
+    python3 "$ARENA/target/main.py" >"$ARENA/logs/target_server.log" 2>&1 &
+TARGET_PID=$!
+
+# --- wait for readiness -------------------------------------------------------
+ready=0
+for _ in $(seq 1 40); do
+    if wget -q --spider --timeout=1 "http://localhost:${PROBE_PORT}/" 2>/dev/null \
+       && wget -q --spider --timeout=1 "http://localhost:${TARGET_PORT}/" 2>/dev/null; then
+        ready=1
+        break
+    fi
+    sleep 0.25
+done
+if [ "$ready" -ne 1 ]; then
+    echo '{"error": "Probe/target servers did not start in time"}'
+    exit 0
+fi
+
+# --- run probe simulations ----------------------------------------------------
+i=0
+while [ "$i" -lt "$SIMS_PER_PROBE" ]; do
+    "$BATTLESNAKE" play \
+        --url "http://localhost:${PROBE_PORT}" -n probe \
+        --url "http://localhost:${TARGET_PORT}" -n target \
+        --width "$BOARD_W" --height "$BOARD_H" \
+        -o "$ARENA/logs/sim_${i}.jsonl" >/dev/null 2>&1 || true
+    i=$((i + 1))
+done
+
+cleanup
+trap - EXIT
+
+# --- parse traces (trusted) and hand results to the agent ---------------------
+python3 -I "$PARSER" "$ARENA/logs" "$OUT" "$PROBE_NUM" "$REMAINING"
+chown 1000:1000 "$OUT" 2>/dev/null || true
+chmod 0644 "$OUT" 2>/dev/null || true
